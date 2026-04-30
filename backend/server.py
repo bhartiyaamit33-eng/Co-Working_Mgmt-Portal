@@ -247,31 +247,28 @@ async def validate_booking(user: dict, payload: BookingIn) -> tuple[dict, dict]:
     if not (af <= today <= au):
         raise HTTPException(400, "Your team is not active for the current period.")
 
-    # Times
+    # Times — convert to IST for human-friendly working hours / day comparisons
+    IST = timezone(timedelta(hours=5, minutes=30))
     start = parse_iso(payload.start_time)
     end = parse_iso(payload.end_time)
     if end <= start:
         raise HTTPException(400, "End time must be after start time.")
-    if start.minute != 0 or end.minute != 0:
-        raise HTTPException(400, "Bookings must be on the hour.")
 
-    duration_h = int((end - start).total_seconds() // 3600)
+    start_ist = start.astimezone(IST)
+    end_ist = end.astimezone(IST)
+    duration_h = (end - start).total_seconds() / 3600
     if duration_h < cfg["min_booking_hours"]:
         raise HTTPException(400, f"Minimum booking is {cfg['min_booking_hours']} hour(s).")
     if duration_h > cfg["max_booking_hours"]:
         raise HTTPException(400, f"Maximum booking is {cfg['max_booking_hours']} hours per slot.")
 
-    # Working hours
-    if start.hour < cfg["working_hours_start"] or end.hour > cfg["working_hours_end"]:
-        raise HTTPException(400, f"Bookings allowed only between {cfg['working_hours_start']}:00 and {cfg['working_hours_end']}:00.")
+    # Working hours (IST)
+    if start_ist.hour < cfg["working_hours_start"] or end_ist.hour > cfg["working_hours_end"] or (end_ist.hour == cfg["working_hours_end"] and end_ist.minute > 0):
+        raise HTTPException(400, f"Bookings allowed only between {cfg['working_hours_start']}:00 and {cfg['working_hours_end']}:00 IST.")
 
-    # Lead time
-    now = datetime.now(timezone.utc)
-    if start < now + timedelta(hours=cfg["lead_time_hours"]):
-        raise HTTPException(400, f"Bookings must be at least {cfg['lead_time_hours']} hour(s) in advance.")
-
-    # Booking window
-    if start.date() > today + timedelta(days=cfg["booking_window_days"]):
+    # Booking window (IST date)
+    today_ist = datetime.now(IST).date()
+    if start_ist.date() > today_ist + timedelta(days=cfg["booking_window_days"]):
         raise HTTPException(400, f"Cannot book more than {cfg['booking_window_days']} days ahead.")
 
     # Seat existence + maintenance
@@ -291,37 +288,38 @@ async def validate_booking(user: dict, payload: BookingIn) -> tuple[dict, dict]:
     if overlap:
         raise HTTPException(409, "This seat is already booked for the selected time.")
 
-    # Daily cap (team)
-    day_start = datetime.combine(start.date(), datetime.min.time(), tzinfo=timezone.utc)
+    # Daily cap (team) — use IST day boundaries
+    day_ist_start = datetime.combine(start_ist.date(), datetime.min.time(), tzinfo=IST)
+    day_start = day_ist_start.astimezone(timezone.utc)
     day_end = day_start + timedelta(days=1)
-    daily_total = 0
+    daily_total = 0.0
     cur = db.bookings.find({
         "team_id": team["id"],
         "status": {"$in": ["pending", "approved"]},
         "start_time": {"$gte": day_start.isoformat(), "$lt": day_end.isoformat()},
     }, {"_id": 0, "start_time": 1, "end_time": 1})
     async for b in cur:
-        daily_total += int((parse_iso(b["end_time"]) - parse_iso(b["start_time"])).total_seconds() // 3600)
+        daily_total += (parse_iso(b["end_time"]) - parse_iso(b["start_time"])).total_seconds() / 3600
     if daily_total + duration_h > cfg["daily_cap_hours"]:
         remaining = max(0, cfg["daily_cap_hours"] - daily_total)
-        raise HTTPException(400, f"Daily cap reached. Your team has used {daily_total} of {cfg['daily_cap_hours']} hours today. You can book at most {remaining} more.")
+        raise HTTPException(400, f"Daily cap reached. Your team has used {daily_total:g} of {cfg['daily_cap_hours']} hours today. You can book at most {remaining:g} more.")
 
-    # Weekly cap (team) — ISO week
-    week_start = (start.date() - timedelta(days=start.weekday()))
-    week_end = week_start + timedelta(days=7)
-    week_start_dt = datetime.combine(week_start, datetime.min.time(), tzinfo=timezone.utc)
-    week_end_dt = datetime.combine(week_end, datetime.min.time(), tzinfo=timezone.utc)
-    weekly_total = 0
+    # Weekly cap (team) — ISO week starting Monday IST
+    week_start_date = start_ist.date() - timedelta(days=start_ist.weekday())
+    week_end_date = week_start_date + timedelta(days=7)
+    week_start_dt = datetime.combine(week_start_date, datetime.min.time(), tzinfo=IST).astimezone(timezone.utc)
+    week_end_dt = datetime.combine(week_end_date, datetime.min.time(), tzinfo=IST).astimezone(timezone.utc)
+    weekly_total = 0.0
     cur = db.bookings.find({
         "team_id": team["id"],
         "status": {"$in": ["pending", "approved"]},
         "start_time": {"$gte": week_start_dt.isoformat(), "$lt": week_end_dt.isoformat()},
     }, {"_id": 0, "start_time": 1, "end_time": 1})
     async for b in cur:
-        weekly_total += int((parse_iso(b["end_time"]) - parse_iso(b["start_time"])).total_seconds() // 3600)
+        weekly_total += (parse_iso(b["end_time"]) - parse_iso(b["start_time"])).total_seconds() / 3600
     if weekly_total + duration_h > cfg["weekly_cap_hours"]:
         remaining = max(0, cfg["weekly_cap_hours"] - weekly_total)
-        raise HTTPException(400, f"Weekly cap reached. Your team has used {weekly_total} of {cfg['weekly_cap_hours']} hours this week. You can book at most {remaining} more.")
+        raise HTTPException(400, f"Weekly cap reached. Your team has used {weekly_total:g} of {cfg['weekly_cap_hours']} hours this week. You can book at most {remaining:g} more.")
 
     return cfg, team
 

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth, formatApiErrorDetail } from "@/lib/auth";
+import Logo from "@/components/Logo";
 import { toast } from "sonner";
 import { ArrowRight } from "lucide-react";
 
@@ -81,7 +82,7 @@ export function AuthShell({ title, subtitle, children }) {
       {/* Right form */}
       <div className="flex items-center justify-center p-6 sm:p-12">
         <div className="w-full max-w-md">
-          <Link to="/" className="font-serif text-2xl text-navy mb-12 inline-block" data-testid="brand-back-home">DSSE</Link>
+          <Logo to="/" size="h-10" className="mb-12" />
           <span className="label-eyebrow text-amber-700">{subtitle}</span>
           <h1 className="font-serif text-3xl sm:text-4xl text-navy mt-2 mb-8">{title}</h1>
           {children}

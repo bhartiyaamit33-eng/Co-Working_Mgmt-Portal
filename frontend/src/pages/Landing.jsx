@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import Logo from "@/components/Logo";
 import { ArrowRight, MapPin, ShieldCheck, Calendar, Users } from "lucide-react";
 
 export default function Landing() {
@@ -7,10 +8,7 @@ export default function Landing() {
       {/* Header */}
       <header className="sticky top-0 z-50 bg-offwhite/80 backdrop-blur-xl border-b border-navy/10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-baseline gap-2">
-            <span className="font-serif text-2xl font-medium tracking-tight text-navy">DSSE</span>
-            <span className="hidden sm:inline label-eyebrow text-[10px]">IIT Bombay</span>
-          </div>
+          <Logo to="/" size="h-10" />
           <div className="flex items-center gap-2">
             <Link to="/guidelines" className="hidden sm:inline-block text-sm text-navy/70 hover:text-navy mr-3" data-testid="nav-guidelines">Guidelines</Link>
             <Link to="/login" className="btn-outline" data-testid="nav-login">Log In</Link>
@@ -116,8 +114,8 @@ export default function Landing() {
       <footer className="border-t border-navy/10 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <div className="font-serif text-xl text-navy">DSSE Co-Working Portal</div>
-            <p className="text-xs text-slate-500 mt-1">Desai Sethi School of Entrepreneurship · IIT Bombay</p>
+            <Logo to={null} size="h-9" />
+            <p className="text-xs text-slate-500 mt-2">Co-Working Booking Portal · 4th Floor, DSSE Building, IIT Bombay</p>
           </div>
           <div className="flex gap-6 text-sm text-slate-500">
             <Link to="/guidelines" className="hover:text-navy">Guidelines</Link>

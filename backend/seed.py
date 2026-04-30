@@ -116,7 +116,7 @@ DEFAULT_CONFIG = {
     "working_hours_end": 18,     # 6 PM
     "daily_cap_hours": 4,
     "weekly_cap_hours": 20,
-    "lead_time_hours": 1,
+    "lead_time_hours": 0,
     "booking_window_days": 7,
     "max_booking_hours": 4,
     "min_booking_hours": 1,

@@ -2,6 +2,7 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 import { useEffect, useState } from "react";
 import api from "@/lib/api";
+import Logo from "@/components/Logo";
 import { Bell, LogOut, User, Calendar, Users, LayoutDashboard, MapPin, Settings, ShieldAlert, FileText, BarChart3, ChevronDown, Menu, X } from "lucide-react";
 
 const memberNav = [
@@ -57,9 +58,8 @@ export default function Layout({ children, title, subtitle, actions }) {
             <button className="md:hidden" onClick={() => setMobileNav(!mobileNav)} data-testid="mobile-nav-toggle">
               {mobileNav ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
-            <Link to={isAdmin ? "/admin" : "/dashboard"} className="flex items-baseline gap-2" data-testid="brand-logo">
-              <span className="font-serif text-2xl font-medium tracking-tight text-navy">DSSE</span>
-              <span className="hidden sm:inline label-eyebrow text-[10px]">Co-Working Portal</span>
+            <Link to={isAdmin ? "/admin" : "/dashboard"} className="flex items-center gap-2" data-testid="brand-logo-link">
+              <Logo to={null} size="h-9" showText />
             </Link>
             {team && (
               <span className="hidden md:inline-flex items-center ml-4 px-2.5 py-1 rounded-md bg-navy/5 text-xs text-navy/80">

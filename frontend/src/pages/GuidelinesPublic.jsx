@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import api from "@/lib/api";
 import { Link } from "react-router-dom";
+import Logo from "@/components/Logo";
 import { ArrowLeft } from "lucide-react";
 
 export default function GuidelinesPublic() {
@@ -11,7 +12,7 @@ export default function GuidelinesPublic() {
       <header className="border-b border-navy/10 bg-offwhite/80 backdrop-blur sticky top-0 z-40">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2 text-navy" data-testid="guidelines-back-home">
-            <ArrowLeft className="w-4 h-4" /> <span className="font-serif text-xl">DSSE</span>
+            <ArrowLeft className="w-4 h-4" /> <Logo to={null} size="h-9" />
           </Link>
           <Link to="/login" className="btn-outline px-4 py-1.5 text-xs">Log in</Link>
         </div>
