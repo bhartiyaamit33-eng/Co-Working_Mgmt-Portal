@@ -1,0 +1,141 @@
+{
+  "theme": "LIGHT",
+  "archetype": "4 (Swiss & High-Contrast / Authority) blended with 'Old Money Tech' styling",
+  "brand_identity": {
+    "vibe": "Modern university research lab. Clean, professional, slightly academic, authoritative.",
+    "concept": "A premium, functional space for elite entrepreneurship students. It must feel like a high-end research facility—efficient, focused, with zero friction."
+  },
+  "colors": {
+    "primary": {
+      "DEFAULT": "#1B2A4E",
+      "foreground": "#FFFFFF",
+      "description": "Deep Navy (IIT Bombay identity anchor). Use for primary CTAs, active states, and dominant text."
+    },
+    "accent": {
+      "DEFAULT": "#E8A33D",
+      "foreground": "#1B2A4E",
+      "description": "Warm Amber. Use sparingly for highlights, secondary CTAs, or selected states on the floor map."
+    },
+    "background": {
+      "DEFAULT": "#FAFAF7",
+      "foreground": "#1B2A4E",
+      "description": "Soft off-white. The canvas for the entire application."
+    },
+    "surface": {
+      "DEFAULT": "#FFFFFF",
+      "border": "rgba(27, 42, 78, 0.08)",
+      "description": "Pure white cards with very subtle navy-tinted borders."
+    },
+    "status": {
+      "success": "#298F4A",
+      "warning": "#E8A33D",
+      "error": "#D93838",
+      "muted": "#8A94A6"
+    }
+  },
+  "typography": {
+    "fonts": {
+      "heading": "Source Serif 4, serif",
+      "ui": "Inter, sans-serif",
+      "mono": "JetBrains Mono, monospace"
+    },
+    "hierarchy": {
+      "h1": "text-4xl sm:text-5xl font-serif font-light tracking-tight text-[#1B2A4E]",
+      "h2": "text-2xl sm:text-3xl lg:text-4xl font-serif tracking-tight text-[#1B2A4E]",
+      "h3": "text-xl sm:text-2xl font-serif text-[#1B2A4E]",
+      "h4": "text-lg sm:text-xl font-sans font-medium text-[#1B2A4E]",
+      "body": "text-base font-sans text-slate-600 leading-relaxed",
+      "label": "text-xs font-sans uppercase tracking-[0.2em] font-bold text-slate-500"
+    },
+    "rules": [
+      "No Inter or generic sans-serif for headings (H1-H3).",
+      "Use Source Serif 4 to convey institutional prestige.",
+      "Labels must have aggressive tracking (0.2em)."
+    ]
+  },
+  "spacing_and_layout": {
+    "containers": "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8",
+    "cards": "p-6 sm:p-8 rounded-xl",
+    "dashboard_grid": "grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6",
+    "marketing_grid": "grid grid-cols-1 md:grid-cols-12 gap-8 lg:gap-12",
+    "rules": [
+      "Use E1 Generous Spacing Philosophy: opt for p-6 or p-8 inside cards.",
+      "Never center-align large blocks of text; keep left-aligned for data and readability.",
+      "Grid items must be direct children of the grid container."
+    ]
+  },
+  "surfaces": {
+    "header": "bg-[#FAFAF7]/80 backdrop-blur-xl border-b border-[#1B2A4E]/10 z-50 sticky top-0",
+    "cards": "bg-white rounded-xl border border-[#1B2A4E]/5 shadow-[0_4px_24px_rgba(27,42,78,0.04)]",
+    "interactive_elements": "hover:border-[#E8A33D]/50 hover:shadow-md transition-all duration-200"
+  },
+  "components": {
+    "buttons": {
+      "primary": "bg-[#1B2A4E] text-white hover:bg-[#1B2A4E]/90 rounded-xl px-6 py-2.5 font-medium transition-colors",
+      "accent": "bg-[#E8A33D] text-[#1B2A4E] hover:bg-[#E8A33D]/90 rounded-xl px-6 py-2.5 font-medium transition-colors",
+      "outline": "border border-[#1B2A4E]/20 text-[#1B2A4E] hover:bg-[#1B2A4E]/5 rounded-xl px-6 py-2.5 font-medium transition-colors"
+    },
+    "floor_map": {
+      "container": "relative w-full aspect-[4/3] bg-white rounded-xl border border-[#1B2A4E]/10 p-4",
+      "seat_available": "fill-white stroke-[#1B2A4E]/20 hover:stroke-[#E8A33D] hover:fill-[#E8A33D]/10 cursor-pointer transition-colors",
+      "seat_booked": "fill-[#1B2A4E]/10 stroke-[#1B2A4E]/20 cursor-not-allowed",
+      "seat_selected": "fill-[#E8A33D] stroke-[#E8A33D] shadow-lg"
+    },
+    "shadcn_overrides": [
+      "Override standard Shadcn 8px radii to 12px (rounded-xl) for a slightly softer, modern look.",
+      "Ensure all Shadcn popovers and dialogs use the #FFFFFF background with the tinted shadow.",
+      "Use Shadcn tables but increase row padding (py-4) for data readability."
+    ]
+  },
+  "icons": {
+    "library": "lucide-react",
+    "style": "Clean, crisp, 1.5px stroke width. Do not use filled icons unless representing an active state."
+  },
+  "motion": {
+    "transitions": "transition-all duration-200 ease-out",
+    "hover_lift": "hover:-translate-y-0.5",
+    "rules": [
+      "Minimalist animations for dashboard functionality.",
+      "Use Framer Motion sparingly for modal entrances (fade-in, slide-up)."
+    ]
+  },
+  "accessibility": {
+    "contrast": "Ensure white text on Deep Navy (#1B2A4E) meets APCA standards.",
+    "testing": "All interactive and key informational elements MUST include a `data-testid` attribute (e.g., `data-testid=\"book-slot-btn\"`).",
+    "focus": "focus-visible:ring-2 focus-visible:ring-[#E8A33D] focus-visible:ring-offset-2"
+  },
+  "media": {
+    "hero_network_bg": {
+      "url": "https://static.prod-images.emergentagent.com/jobs/d19453aa-87a6-432f-a816-efd987357bd2/images/4b044e7dbc9807af5dcc854862ddfaeef5621131ad58edc4abccf8e6592568ff.png",
+      "category": "landing_page_hero",
+      "description": "Abstract 3D network of workstations. Use this in the hero section of the landing page, with an overlay of bg-[#FAFAF7]/80 to keep it subtle and allow the Source Serif 4 typography to pop."
+    },
+    "coworking_floor_abstract": {
+      "url": "https://static.prod-images.emergentagent.com/jobs/d19453aa-87a6-432f-a816-efd987357bd2/images/d4400619bc046da56df272c8e719d92604f2af0998fc351bf0bb87bbd6da5406.png",
+      "category": "marketing_feature",
+      "description": "Clean architectural rendering. Use this next to the 'How it works' or 'About the Space' section on the landing page."
+    },
+    "students_collaborating": {
+      "url": "https://images.unsplash.com/photo-1758270705172-07b53627dfcb?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxODh8MHwxfHNlYXJjaHwzfHxzdHVkZW50cyUyMGNvbGxhYm9yYXRpbmclMjBsYXB0b3B8ZW58MHx8fHwxNzc3NTQyMDk1fDA&ixlib=rb-4.1.0&q=85",
+      "category": "community_section",
+      "description": "Photo of students working. Use for the 'Join the Community' CTA area or Auth screen backgrounds."
+    },
+    "modern_university": {
+      "url": "https://images.pexels.com/photos/14902046/pexels-photo-14902046.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "category": "auth_background",
+      "description": "Modern architecture shot. Perfect for the split-screen login/signup page background."
+    }
+  },
+  "instructions_to_main_agent": [
+    "You are building a React frontend using Javascript (.js/.jsx). Do not generate TypeScript files.",
+    "Install `lucide-react` for icons.",
+    "Set up Tailwind with the custom colors: primary (#1B2A4E), accent (#E8A33D), and background (#FAFAF7).",
+    "Include Google Fonts: 'Source Serif 4' for the serif family and 'Inter' for the sans-serif family.",
+    "Implement the 55-seat floor map using an interactive SVG or a CSS Grid layout, ensuring colors map to the seat_available, seat_booked, and seat_selected definitions.",
+    "Use Shadcn components for all forms, modals, tables, and dropdowns, but heavily customize them to remove the default 'Vercel' look (apply rounded-xl, the designated colors, and slightly larger padding).",
+    "For the Landing Page, construct custom HTML/Tailwind bento-box layouts. Do not rely heavily on Shadcn 'Card' components for marketing—build expressive, asymmetrical layouts.",
+    "Include `data-testid` on all buttons, links, form inputs, menus, and table actions.",
+    "Ensure the Admin dashboard uses a strict, dense grid layout maximizing screen real-estate for KPIs, Approvals, and Violation tracking.",
+    "Never use placeholder text for the brand logo. Instead, render 'DSSE' using the Source Serif 4 font, tracking-tight, text-2xl, and #1B2A4E color."
+  ]
+}
