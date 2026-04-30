@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Layout from "@/components/Layout";
 import api from "@/lib/api";
 import { Link } from "react-router-dom";
@@ -8,9 +8,12 @@ import { LineChart, Line, ResponsiveContainer, XAxis, YAxis, Tooltip } from "rec
 export default function AdminDashboard() {
   const [data, setData] = useState(null);
 
-  useEffect(() => {
-    api.get("/admin/dashboard").then((r) => setData(r.data));
+  const loadDashboard = useCallback(async () => {
+    const { data: d } = await api.get("/admin/dashboard");
+    setData(d);
   }, []);
+
+  useEffect(() => { loadDashboard(); }, [loadDashboard]);
 
   const kpis = [
     { label: "Today's bookings", value: data?.today_bookings ?? "—", icon: Calendar, link: "/admin/approvals" },

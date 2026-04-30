@@ -1,6 +1,6 @@
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import api from "@/lib/api";
 import Logo from "@/components/Logo";
 import { Bell, LogOut, User, Calendar, Users, LayoutDashboard, MapPin, Settings, ShieldAlert, FileText, BarChart3, ChevronDown, Menu, X } from "lucide-react";
@@ -34,13 +34,16 @@ export default function Layout({ children, title, subtitle, actions }) {
   const items = isAdmin && location.pathname.startsWith("/admin") ? adminNav : memberNav;
   const unread = notifs.filter((n) => !n.read).length;
 
-  const loadNotifs = async () => {
+  const loadNotifs = useCallback(async () => {
     try {
       const { data } = await api.get("/notifications");
       setNotifs(data);
-    } catch {}
-  };
-  useEffect(() => { if (user) loadNotifs(); }, [user]);
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error("notifications fetch failed:", e);
+    }
+  }, []);
+  useEffect(() => { if (user) loadNotifs(); }, [user, loadNotifs]);
 
   const markAllRead = async () => {
     await api.post("/notifications/read-all");

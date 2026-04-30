@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Layout from "@/components/Layout";
 import api, { formatApiErrorDetail } from "@/lib/api";
 import { toast } from "sonner";
@@ -9,11 +9,11 @@ export default function AdminViolations() {
   const [users, setUsers] = useState([]);
   const [showCreate, setShowCreate] = useState(false);
 
-  const load = () => api.get("/admin/violations").then((r) => setViolations(r.data));
+  const load = useCallback(() => api.get("/admin/violations").then((r) => setViolations(r.data)), []);
   useEffect(() => {
     load();
     api.get("/admin/users").then((r) => setUsers(r.data));
-  }, []);
+  }, [load]);
 
   return (
     <Layout title="Violations" subtitle="Tracking & enforcement"

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Layout from "@/components/Layout";
 import api, { formatApiErrorDetail } from "@/lib/api";
 import { toast } from "sonner";
@@ -9,8 +9,8 @@ export default function AdminTeams() {
   const [showCreate, setShowCreate] = useState(false);
   const [showImport, setShowImport] = useState(false);
 
-  const load = () => api.get("/admin/teams").then((r) => setTeams(r.data));
-  useEffect(() => { load(); }, []);
+  const load = useCallback(() => api.get("/admin/teams").then((r) => setTeams(r.data)), []);
+  useEffect(() => { load(); }, [load]);
 
   const programLabel = { ideas_l1: "IDEAS L1", ideas_l2: "IDEAS L2", groww: "Groww", individual: "Individual" };
 
@@ -118,13 +118,13 @@ function ImportCsv({ onClose, onImported }) {
         <div className="mt-4 max-h-64 overflow-y-auto text-xs">
           {preview.errors?.length > 0 && (
             <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 mb-2">
-              {preview.errors.map((e, i) => <div key={i}>{e}</div>)}
+              {preview.errors.map((e) => <div key={`err-${e}`}>{e}</div>)}
             </div>
           )}
           {preview.preview?.length > 0 && (
             <table className="w-full">
               <thead><tr className="text-slate-500"><th className="text-left">Name</th><th className="text-left">Program</th><th>Tier</th><th>From</th><th>Until</th></tr></thead>
-              <tbody>{preview.preview.map((r, i) => <tr key={i} className="border-t border-slate-100"><td>{r.name}</td><td>{r.program}</td><td className="text-center">{r.priority_tier}</td><td>{r.active_from}</td><td>{r.active_until}</td></tr>)}</tbody>
+              <tbody>{preview.preview.map((r) => <tr key={`prev-${r.name}`} className="border-t border-slate-100"><td>{r.name}</td><td>{r.program}</td><td className="text-center">{r.priority_tier}</td><td>{r.active_from}</td><td>{r.active_until}</td></tr>)}</tbody>
             </table>
           )}
         </div>

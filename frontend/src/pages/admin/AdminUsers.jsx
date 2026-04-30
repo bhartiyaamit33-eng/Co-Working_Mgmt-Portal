@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Layout from "@/components/Layout";
 import api, { formatApiErrorDetail } from "@/lib/api";
 import { toast } from "sonner";
@@ -13,15 +13,15 @@ export default function AdminUsers() {
   const [approving, setApproving] = useState(null);
   const [approvalForm, setApprovalForm] = useState({ team_id: "", role: "member" });
 
-  const load = () => {
+  const load = useCallback(() => {
     const params = {};
     if (filterRole) params.role = filterRole;
     if (filterStatus) params.status = filterStatus;
     api.get("/admin/users", { params }).then((r) => setUsers(r.data));
-  };
+  }, [filterRole, filterStatus]);
 
   useEffect(() => { api.get("/admin/teams").then((r) => setTeams(r.data)); }, []);
-  useEffect(() => { load(); }, [filterRole, filterStatus]);
+  useEffect(() => { load(); }, [load]);
 
   const approve = async (u) => {
     try {

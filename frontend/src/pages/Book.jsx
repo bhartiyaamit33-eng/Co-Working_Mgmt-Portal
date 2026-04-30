@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import Layout from "@/components/Layout";
 import FloorMap from "@/components/FloorMap";
 import api, { formatApiErrorDetail } from "@/lib/api";
@@ -20,14 +20,21 @@ export default function Book() {
   const [drawerHours, setDrawerHours] = useState([]);
   const [busy, setBusy] = useState(false);
 
-  useEffect(() => {
-    api.get("/seats").then((r) => setSeats(r.data));
-    api.get("/configuration").then((r) => setConfig(r.data));
+  const loadInitial = useCallback(async () => {
+    const [s, c] = await Promise.all([api.get("/seats"), api.get("/configuration")]);
+    setSeats(s.data);
+    setConfig(c.data);
   }, []);
+  const loadDayBookings = useCallback(async (d) => {
+    const { data } = await api.get(`/bookings/day-overview`, { params: { day: isoDate(d) } });
+    setBookings(data);
+  }, []);
+
+  useEffect(() => { loadInitial(); }, [loadInitial]);
   useEffect(() => {
     if (!date) return;
-    api.get(`/bookings/day-overview`, { params: { day: isoDate(date) } }).then((r) => setBookings(r.data));
-  }, [date]);
+    loadDayBookings(date);
+  }, [date, loadDayBookings]);
 
   const dates = useMemo(() => {
     const out = [];
@@ -101,9 +108,7 @@ export default function Book() {
       });
       toast.success(data.status === "approved" ? "Booking confirmed!" : "Booking submitted. Awaiting approval.");
       closeDrawer();
-      // Refresh
-      const r = await api.get(`/bookings/day-overview`, { params: { day: isoDate(date) } });
-      setBookings(r.data);
+      await loadDayBookings(date);
     } catch (e) {
       toast.error(formatApiErrorDetail(e.response?.data?.detail) || "Failed to book");
     } finally { setBusy(false); }
@@ -252,8 +257,8 @@ function TimelineView({ seats, bookings, hours, selectedSeatId, onCellClick }) {
           <div></div>
           {hours.map((h) => <div key={h} className="text-[10px] text-slate-500 text-center pb-2">{h}:00</div>)}
           {seats.map((s) => (
-            <>
-              <div key={`l-${s.id}`} className="text-[11px] text-navy/70 font-medium pr-2 py-1 text-right">#{s.id}</div>
+            <Fragment key={`row-${s.id}`}>
+              <div className="text-[11px] text-navy/70 font-medium pr-2 py-1 text-right">#{s.id}</div>
               {hours.map((h) => {
                 const st = cellState(s.id, h);
                 const isSel = selectedSeatId === s.id;
@@ -269,7 +274,7 @@ function TimelineView({ seats, bookings, hours, selectedSeatId, onCellClick }) {
                   />
                 );
               })}
-            </>
+            </Fragment>
           ))}
         </div>
       </div>

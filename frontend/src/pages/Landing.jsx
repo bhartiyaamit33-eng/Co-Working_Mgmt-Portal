@@ -148,19 +148,19 @@ function FloorPreview() {
           <rect x="6" y="4" width="12" height="6" rx="1" fill="#1B2A4E" fillOpacity="0.08" />
           <text x="12" y="8" fontSize="2.2" textAnchor="middle" fill="#1B2A4E">GATE</text>
           {[12, 27, 42, 57, 72, 87].map((y, i) => (
-            <g key={i}>
+            <g key={`R-cluster-${y}`}>
               <line x1="60" y1={y} x2="84" y2={y} stroke="#1B2A4E" strokeOpacity="0.2" strokeWidth="0.3" strokeDasharray="0.5 0.4" />
               {[60, 67, 77, 84, 67, 77].map((x, j) => (
-                <circle key={j} cx={x} cy={y + (j < 2 || j === 3 ? 0 : (j < 4 ? -5 : 5))} r="2.2"
+                <circle key={`R-${y}-${j}`} cx={x} cy={y + (j < 2 || j === 3 ? 0 : (j < 4 ? -5 : 5))} r="2.2"
                   fill={i === 3 && j === 4 ? "#FEF6E7" : "#fff"} stroke="#1B2A4E" strokeOpacity="0.4" strokeWidth="0.3" />
               ))}
             </g>
           ))}
-          {[20, 38, 56, 78].map((y, i) => (
-            <g key={`L${i}`}>
+          {[20, 38, 56, 78].map((y) => (
+            <g key={`L-cluster-${y}`}>
               <line x1="40" y1={y} x2="23" y2={y} stroke="#1B2A4E" strokeOpacity="0.2" strokeWidth="0.3" strokeDasharray="0.5 0.4" />
               {[40, 33, 23, 33, 23].map((x, j) => (
-                <circle key={j} cx={x} cy={y + (j === 0 ? 0 : (j < 3 ? -5 : 5))} r="2.2"
+                <circle key={`L-${y}-${j}`} cx={x} cy={y + (j === 0 ? 0 : (j < 3 ? -5 : 5))} r="2.2"
                   fill="#fff" stroke="#1B2A4E" strokeOpacity="0.4" strokeWidth="0.3" />
               ))}
             </g>

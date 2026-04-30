@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import Layout from "@/components/Layout";
 import api from "@/lib/api";
 import { Download } from "lucide-react";
@@ -8,10 +8,16 @@ export default function AdminReports() {
   const [util, setUtil] = useState(null);
   const [team, setTeam] = useState([]);
 
-  useEffect(() => {
-    api.get("/admin/reports/utilization").then((r) => setUtil(r.data));
-    api.get("/admin/reports/team-usage").then((r) => setTeam(r.data));
+  const loadReports = useCallback(async () => {
+    const [u, t] = await Promise.all([
+      api.get("/admin/reports/utilization"),
+      api.get("/admin/reports/team-usage"),
+    ]);
+    setUtil(u.data);
+    setTeam(t.data);
   }, []);
+
+  useEffect(() => { loadReports(); }, [loadReports]);
 
   const exportCsv = async () => {
     const { data } = await api.get("/admin/reports/export");
@@ -51,15 +57,15 @@ export default function AdminReports() {
               <div></div>
               {util.hours.map((h) => <div key={h} className="text-[10px] text-slate-500 text-center">{h}</div>)}
               {Array.from({ length: 55 }, (_, i) => i + 1).map((sid) => (
-                <>
-                  <div key={`l-${sid}`} className="text-[10px] text-slate-500 text-right pr-1">#{sid}</div>
+                <Fragment key={`heatmap-row-${sid}`}>
+                  <div className="text-[10px] text-slate-500 text-right pr-1">#{sid}</div>
                   {util.hours.map((h) => {
                     const v = util.matrix[`${sid}-${h}`] || 0;
                     const intensity = maxHeat > 0 ? v / maxHeat : 0;
                     const bg = intensity === 0 ? "rgba(27,42,78,0.04)" : `rgba(232,163,61,${0.15 + intensity * 0.85})`;
                     return <div key={`${sid}-${h}`} className="h-5 rounded-sm" style={{ background: bg }} title={`Seat ${sid}, ${h}:00 — ${v} bookings`} />;
                   })}
-                </>
+                </Fragment>
               ))}
             </div>
           </div>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Layout from "@/components/Layout";
 import api, { formatApiErrorDetail } from "@/lib/api";
 import { toast } from "sonner";
@@ -10,8 +10,8 @@ export default function Approvals() {
   const [reject, setReject] = useState(null);
   const [reason, setReason] = useState("");
 
-  const load = () => api.get("/admin/bookings/pending").then((r) => setItems(r.data));
-  useEffect(() => { load(); }, []);
+  const load = useCallback(() => api.get("/admin/bookings/pending").then((r) => setItems(r.data)), []);
+  useEffect(() => { load(); }, [load]);
 
   const approve = async (id) => {
     try {

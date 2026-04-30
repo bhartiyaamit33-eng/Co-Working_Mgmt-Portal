@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Layout from "@/components/Layout";
 import api from "@/lib/api";
 import { BookingRow } from "./Dashboard";
@@ -8,8 +8,8 @@ import { Calendar } from "lucide-react";
 export default function MyBookings() {
   const [tab, setTab] = useState("upcoming");
   const [bookings, setBookings] = useState([]);
-  const load = () => api.get("/bookings/mine").then((r) => setBookings(r.data));
-  useEffect(() => { load(); }, []);
+  const load = useCallback(() => api.get("/bookings/mine").then((r) => setBookings(r.data)), []);
+  useEffect(() => { load(); }, [load]);
 
   const now = new Date();
   const filtered = bookings.filter((b) => {

@@ -13,7 +13,12 @@ export function AuthProvider({ children }) {
       setUser(data.user);
       setTeam(data.team);
       return data.user;
-    } catch {
+    } catch (e) {
+      // 401 here is expected when not logged in — only log unexpected errors.
+      if (e?.response?.status && e.response.status !== 401) {
+        // eslint-disable-next-line no-console
+        console.error("auth/me failed:", e);
+      }
       setUser(false);
       setTeam(null);
       return false;
@@ -25,10 +30,8 @@ export function AuthProvider({ children }) {
   }, [refreshMe]);
 
   const login = async (email, password) => {
-    const { data } = await api.post("/auth/login", { email, password });
-    if (data.token) localStorage.setItem("dsse_token", data.token);
-    await refreshMe();
-    return data.user;
+    await api.post("/auth/login", { email, password });
+    return await refreshMe();
   };
 
   const signup = async (payload) => {
@@ -37,8 +40,12 @@ export function AuthProvider({ children }) {
   };
 
   const logout = async () => {
-    try { await api.post("/auth/logout"); } catch {}
-    localStorage.removeItem("dsse_token");
+    try {
+      await api.post("/auth/logout");
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error("logout failed:", e);
+    }
     setUser(false);
     setTeam(null);
   };

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Layout from "@/components/Layout";
 import api, { formatApiErrorDetail } from "@/lib/api";
 import { toast } from "sonner";
@@ -7,7 +7,12 @@ export default function AdminConfiguration() {
   const [cfg, setCfg] = useState(null);
   const [busy, setBusy] = useState(false);
 
-  useEffect(() => { api.get("/configuration").then((r) => setCfg(r.data)); }, []);
+  const loadCfg = useCallback(async () => {
+    const { data } = await api.get("/configuration");
+    setCfg(data);
+  }, []);
+
+  useEffect(() => { loadCfg(); }, [loadCfg]);
 
   const set = (k) => (e) => setCfg({ ...cfg, [k]: e.target.type === "number" ? parseInt(e.target.value) : e.target.value });
 

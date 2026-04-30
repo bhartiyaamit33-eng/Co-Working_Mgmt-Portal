@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import Layout from "@/components/Layout";
 import { useAuth } from "@/lib/auth";
@@ -12,17 +12,31 @@ export default function Dashboard() {
   const [config, setConfig] = useState(null);
   const [usage, setUsage] = useState({ daily: 0, weekly: 0 });
 
-  useEffect(() => {
-    api.get("/bookings/mine").then((r) => setBookings(r.data));
-    api.get("/configuration").then((r) => setConfig(r.data));
+  const loadBookings = useCallback(async () => {
+    const { data } = await api.get("/bookings/mine");
+    setBookings(data);
+  }, []);
+  const loadConfig = useCallback(async () => {
+    const { data } = await api.get("/configuration");
+    setConfig(data);
+  }, []);
+  const loadTeamUsage = useCallback(async (teamId) => {
+    const { data } = await api.get(`/teams/${teamId}`);
+    setUsage({ daily: 0, weekly: data.weekly_hours || 0 });
   }, []);
 
   useEffect(() => {
+    loadBookings();
+    loadConfig();
+  }, [loadBookings, loadConfig]);
+
+  useEffect(() => {
     if (!team) return;
-    api.get(`/teams/${team.id}`).then((r) => {
-      setUsage({ daily: 0, weekly: r.data.weekly_hours || 0 });
-    }).catch(() => {});
-  }, [team]);
+    loadTeamUsage(team.id).catch((e) => {
+      // eslint-disable-next-line no-console
+      console.error("team usage load failed:", e);
+    });
+  }, [team, loadTeamUsage]);
 
   const upcoming = bookings.filter((b) => ["pending", "approved"].includes(b.status) && new Date(b.start_time) > new Date()).slice(0, 5);
   const weeklyCap = config?.weekly_cap_hours || 20;

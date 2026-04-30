@@ -94,8 +94,8 @@ export default function FloorMap({ seats = [], bookings = [], workingHours = [9,
           <text x="87.5" y="62" fontSize="1.6" textAnchor="middle" fill="#1B2A4E" fillOpacity="0.6" className="font-sans">Pillar</text>
 
           {/* Cluster spines */}
-          {spines.map((l, i) => (
-            <line key={i} x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2} stroke="#1B2A4E" strokeOpacity="0.18" strokeWidth="0.3" strokeDasharray="0.5 0.4" />
+          {spines.map((l) => (
+            <line key={`spine-${l.x1}-${l.y1}-${l.x2}-${l.y2}`} x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2} stroke="#1B2A4E" strokeOpacity="0.18" strokeWidth="0.3" strokeDasharray="0.5 0.4" />
           ))}
 
           {/* Connector lines from spine to off-spine seats */}

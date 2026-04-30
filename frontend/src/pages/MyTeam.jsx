@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Layout from "@/components/Layout";
 import api from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -9,9 +9,14 @@ export default function MyTeam() {
   const { team } = useAuth();
   const [data, setData] = useState(null);
 
+  const loadTeam = useCallback(async (teamId) => {
+    const { data: d } = await api.get(`/teams/${teamId}`);
+    setData(d);
+  }, []);
+
   useEffect(() => {
-    if (team) api.get(`/teams/${team.id}`).then((r) => setData(r.data));
-  }, [team]);
+    if (team) loadTeam(team.id);
+  }, [team, loadTeam]);
 
   if (!team) return (
     <Layout title="My team" subtitle="Team overview">

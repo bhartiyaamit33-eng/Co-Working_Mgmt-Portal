@@ -7,8 +7,8 @@ from datetime import datetime, timezone, timedelta, date
 BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://iit-workspace.preview.emergentagent.com").rstrip("/")
 API = f"{BASE_URL}/api"
 
-SUPER_ADMIN_EMAIL = "ideas.iitb@gmail.com"
-SUPER_ADMIN_PASSWORD = "Admin@123"
+SUPER_ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "ideas.iitb@gmail.com")
+SUPER_ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "Admin@123")
 
 # shared state across tests
 STATE = {}
@@ -107,7 +107,7 @@ class TestSeatsConfig:
         assert cfg["working_hours_end"] == 18
         assert cfg["daily_cap_hours"] == 4
         assert cfg["weekly_cap_hours"] == 20
-        assert cfg["lead_time_hours"] == 1
+        assert cfg["lead_time_hours"] == 0
         assert cfg["booking_window_days"] == 7
 
     def test_admin_update_seat_maintenance(self, admin_session):
@@ -121,9 +121,11 @@ class TestSeatsConfig:
         admin_session.put(f"{API}/admin/seats/55", json={"status": "available"})
 
     def test_configuration_update_admin(self, admin_session):
-        r = admin_session.put(f"{API}/admin/configuration", json={"lead_time_hours": 1})
+        r = admin_session.put(f"{API}/admin/configuration", json={"lead_time_hours": 2})
         assert r.status_code == 200
-        assert r.json()["lead_time_hours"] == 1
+        assert r.json()["lead_time_hours"] == 2
+        # Restore default for downstream tests
+        admin_session.put(f"{API}/admin/configuration", json={"lead_time_hours": 0})
 
 
 # ---------------- TEAMS ----------------
@@ -276,31 +278,19 @@ class TestBookings:
 
     def test_working_hours_rejected(self):
         h = {"Authorization": f"Bearer {STATE['member_token']}"}
-        start = _next_weekday_at_hour(7, 2)  # before 9
+        # UTC 02:00 → IST 07:30, which is before 09:00 IST working hours
+        start = _next_weekday_at_hour(2, 2)
         end = start + timedelta(hours=1)
         r = requests.post(f"{API}/bookings", json={
             "seat_id": 2, "start_time": start.isoformat(), "end_time": end.isoformat()
         }, headers=h)
         assert r.status_code == 400
 
-    def test_lead_time_rejected(self):
+    def test_lead_time_rule_disabled(self):
+        """Lead time is now 0 — same-day immediate bookings should succeed."""
         h = {"Authorization": f"Bearer {STATE['member_token']}"}
-        # Use a time less than 1h ahead but within working hours
-        now = datetime.now(timezone.utc)
-        # ensure start hour is valid and within 1h window - but only if in working hours
-        start = now.replace(minute=0, second=0, microsecond=0) + timedelta(minutes=30)  # less than 1h ahead
-        start = start.replace(minute=0)  # back to whole hour
-        if start <= now:
-            start = start + timedelta(hours=1)
-        # if hour not in working range, skip assertion
-        if 9 <= start.hour < 18 and start < now + timedelta(hours=1):
-            end = start + timedelta(hours=1)
-            r = requests.post(f"{API}/bookings", json={
-                "seat_id": 2, "start_time": start.isoformat(), "end_time": end.isoformat()
-            }, headers=h)
-            assert r.status_code == 400
-        else:
-            pytest.skip("Can't construct lead time failure scenario at this time")
+        cfg = requests.get(f"{API}/configuration", headers=h).json()
+        assert cfg["lead_time_hours"] == 0
 
     def test_daily_cap_rejected(self):
         h = {"Authorization": f"Bearer {STATE['member_token']}"}

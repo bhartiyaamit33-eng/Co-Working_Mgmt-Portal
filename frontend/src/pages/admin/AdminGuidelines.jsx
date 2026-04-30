@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Layout from "@/components/Layout";
 import api, { formatApiErrorDetail } from "@/lib/api";
 import { Markdown } from "@/pages/GuidelinesPublic";
@@ -9,8 +9,8 @@ export default function AdminGuidelines() {
   const [list, setList] = useState([]);
   const [showCreate, setShowCreate] = useState(false);
 
-  const load = () => api.get("/admin/guidelines").then((r) => setList(r.data));
-  useEffect(() => { load(); }, []);
+  const load = useCallback(() => api.get("/admin/guidelines").then((r) => setList(r.data)), []);
+  useEffect(() => { load(); }, [load]);
 
   const activate = async (id) => {
     await api.post(`/admin/guidelines/${id}/activate`);

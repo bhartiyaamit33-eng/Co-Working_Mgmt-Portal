@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Layout from "@/components/Layout";
 import FloorMap from "@/components/FloorMap";
 import api from "@/lib/api";
@@ -9,8 +9,8 @@ export default function AdminSeats() {
   const [seats, setSeats] = useState([]);
   const [selected, setSelected] = useState(null);
 
-  const load = () => api.get("/seats").then((r) => setSeats(r.data));
-  useEffect(() => { load(); }, []);
+  const load = useCallback(() => api.get("/seats").then((r) => setSeats(r.data)), []);
+  useEffect(() => { load(); }, [load]);
 
   const toggleMaintenance = async () => {
     if (!selected) return;

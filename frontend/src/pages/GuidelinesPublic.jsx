@@ -33,21 +33,51 @@ export default function GuidelinesPublic() {
 }
 
 export function Markdown({ text }) {
-  // Minimal renderer: headings, bullet lists, paragraphs, bold
+  // Safe renderer: headings, bullet lists, paragraphs, **bold** (no dangerouslySetInnerHTML).
   const lines = (text || "").split("\n");
-  const out = [];
+  const blocks = [];
   let listBuf = [];
-  const flush = () => { if (listBuf.length) { out.push(<ul key={out.length} className="list-disc pl-6 my-3 space-y-1">{listBuf.map((x, i) => <li key={i} className="text-slate-700" dangerouslySetInnerHTML={{ __html: bold(x) }} />)}</ul>); listBuf = []; } };
-  const bold = (s) => s.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
-  lines.forEach((raw, i) => {
-    const ln = raw;
-    if (ln.startsWith("# ")) { flush(); out.push(<h1 key={i} className="font-serif text-3xl text-navy mt-8 mb-3">{ln.slice(2)}</h1>); }
-    else if (ln.startsWith("## ")) { flush(); out.push(<h2 key={i} className="font-serif text-2xl text-navy mt-6 mb-2">{ln.slice(3)}</h2>); }
-    else if (ln.startsWith("### ")) { flush(); out.push(<h3 key={i} className="font-serif text-lg text-navy mt-4 mb-2">{ln.slice(4)}</h3>); }
+  const flushList = () => {
+    if (listBuf.length) {
+      blocks.push({ type: "ul", items: [...listBuf] });
+      listBuf = [];
+    }
+  };
+  lines.forEach((ln) => {
+    if (ln.startsWith("# ")) { flushList(); blocks.push({ type: "h1", text: ln.slice(2) }); }
+    else if (ln.startsWith("## ")) { flushList(); blocks.push({ type: "h2", text: ln.slice(3) }); }
+    else if (ln.startsWith("### ")) { flushList(); blocks.push({ type: "h3", text: ln.slice(4) }); }
     else if (ln.startsWith("- ")) { listBuf.push(ln.slice(2)); }
-    else if (ln.trim() === "") { flush(); }
-    else { flush(); out.push(<p key={i} className="text-slate-700 leading-relaxed my-2" dangerouslySetInnerHTML={{ __html: bold(ln) }} />); }
+    else if (ln.trim() === "") { flushList(); }
+    else { flushList(); blocks.push({ type: "p", text: ln }); }
   });
-  flush();
-  return <>{out}</>;
+  flushList();
+
+  // Split a string on **bold** markers and return a React fragment array.
+  const renderInline = (str) => {
+    const parts = str.split(/(\*\*[^*]+\*\*)/g);
+    return parts.map((p, i) => {
+      if (p.startsWith("**") && p.endsWith("**")) {
+        return <strong key={`b-${i}`}>{p.slice(2, -2)}</strong>;
+      }
+      return <span key={`t-${i}`}>{p}</span>;
+    });
+  };
+
+  return (
+    <>
+      {blocks.map((b, i) => {
+        const k = `${b.type}-${i}`;
+        if (b.type === "h1") return <h1 key={k} className="font-serif text-3xl text-navy mt-8 mb-3">{b.text}</h1>;
+        if (b.type === "h2") return <h2 key={k} className="font-serif text-2xl text-navy mt-6 mb-2">{b.text}</h2>;
+        if (b.type === "h3") return <h3 key={k} className="font-serif text-lg text-navy mt-4 mb-2">{b.text}</h3>;
+        if (b.type === "ul") return (
+          <ul key={k} className="list-disc pl-6 my-3 space-y-1">
+            {b.items.map((item, j) => <li key={`${k}-${j}-${item.slice(0, 12)}`} className="text-slate-700">{renderInline(item)}</li>)}
+          </ul>
+        );
+        return <p key={k} className="text-slate-700 leading-relaxed my-2">{renderInline(b.text)}</p>;
+      })}
+    </>
+  );
 }
