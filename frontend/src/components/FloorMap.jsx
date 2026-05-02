@@ -1,23 +1,34 @@
 import { useMemo } from "react";
 
+// Map a seat number (1-55) to its cluster id (1-10).
+// Right column (top→bottom): 1-6, 7-12, 13-18, 19-23 (pillar/5 seats), 24-29, 30-35
+// Left column (top→bottom near gate first): 51-55, 46-50, 41-45, 36-40
+const clusterOf = (id) => {
+  if (id <= 6) return 1;
+  if (id <= 12) return 2;
+  if (id <= 18) return 3;
+  if (id <= 23) return 4;
+  if (id <= 29) return 5;
+  if (id <= 35) return 6;
+  if (id <= 40) return 10;
+  if (id <= 45) return 9;
+  if (id <= 50) return 8;
+  return 7;
+};
+
 /**
  * FloorMap — renders the 55-seat fishbone layout as an interactive SVG.
- * Props:
- *  - seats: array of {id, position_x, position_y, status, role, zone}
- *  - bookings: array of {seat_id, start_time, end_time, status} for the selected day
- *  - workingHours: [start, end] (e.g., [9, 18])
- *  - selectedSeatId: number | null
- *  - onSeatClick: fn(seat)
+ * Each cluster is drawn with a clear skeleton:
+ *  - a main horizontal spine that extends beyond the outermost seats
+ *  - 4 diagonal branches from a central junction to each corner seat
+ * Seats are always circles regardless of role.
  */
 export default function FloorMap({ seats = [], bookings = [], workingHours = [9, 18], selectedSeatId, onSeatClick }) {
   const totalHours = workingHours[1] - workingHours[0];
 
-  // Map seat_id -> hours booked count
   const seatStatus = useMemo(() => {
     const status = {};
-    for (const s of seats) {
-      status[s.id] = { hours: 0, maintenance: s.status === "maintenance" };
-    }
+    for (const s of seats) status[s.id] = { hours: 0, maintenance: s.status === "maintenance" };
     for (const b of bookings) {
       const start = new Date(b.start_time);
       const end = new Date(b.end_time);
@@ -37,34 +48,32 @@ export default function FloorMap({ seats = [], bookings = [], workingHours = [9,
     return { fill: "#FEF6E7", stroke: "#E8A33D", text: "#1B2A4E" };
   };
 
-  // Build cluster spines for visual ribs
-  const spines = useMemo(() => {
-    // Group by approximate center y, then plot horizontal lines from min to max x
+  // Build cluster geometry: spine + 4 diagonal branches per cluster.
+  const clusters = useMemo(() => {
     const groups = {};
     for (const s of seats) {
-      // Each cluster shares a "center y" near the spine seats; group by y (rounded to 5)
-      const isSpine = s.role === "spine_left" || s.role === "spine_right";
-      if (!isSpine) continue;
-      const key = Math.round(s.position_y);
-      if (!groups[key]) groups[key] = [];
-      groups[key].push(s);
+      const cid = clusterOf(s.id);
+      (groups[cid] ||= []).push(s);
     }
-    const lines = [];
-    Object.values(groups).forEach((arr) => {
-      if (arr.length === 1) {
-        // Left cluster (single tip): draw line going inward
-        const s = arr[0];
-        if (s.position_x < 50) {
-          lines.push({ x1: s.position_x, y1: s.position_y, x2: 23, y2: s.position_y });
-        } else {
-          lines.push({ x1: s.position_x, y1: s.position_y, x2: 67, y2: s.position_y });
-        }
-      } else if (arr.length === 2) {
-        const [a, b] = arr.sort((p, q) => p.position_x - q.position_x);
-        lines.push({ x1: a.position_x, y1: a.position_y, x2: b.position_x, y2: b.position_y });
-      }
-    });
-    return lines;
+    return Object.entries(groups).map(([cid, members]) => {
+      const spineSeats = members.filter((s) => s.role && s.role.startsWith("spine"));
+      const corners = members.filter((s) => s.role && !s.role.startsWith("spine"));
+      if (spineSeats.length === 0 || corners.length === 0) return null;
+      const spineY = spineSeats[0].position_y;
+      // Junction sits at the midpoint of the corner seats' X coordinates, on the spine line.
+      const junctionX = corners.reduce((sum, s) => sum + s.position_x, 0) / corners.length;
+      const minX = Math.min(...members.map((s) => s.position_x));
+      const maxX = Math.max(...members.map((s) => s.position_x));
+      // Extend the spine 4 units past the outermost seats so the skeleton is visible.
+      return {
+        cid: parseInt(cid),
+        spineY,
+        junctionX,
+        spineStart: minX - 4,
+        spineEnd: maxX + 4,
+        corners,
+      };
+    }).filter(Boolean);
   }, [seats]);
 
   return (
@@ -77,6 +86,7 @@ export default function FloorMap({ seats = [], bookings = [], workingHours = [9,
         <svg viewBox="0 0 100 100" className="w-full h-full" data-testid="floor-map-svg">
           {/* Outer floor outline */}
           <rect x="2" y="2" width="96" height="96" rx="2" fill="#FAFAF7" stroke="#1B2A4E" strokeOpacity="0.15" strokeWidth="0.3" />
+
           {/* Gate (top-left) */}
           <g>
             <rect x="6" y="4" width="12" height="6" rx="1" fill="#1B2A4E" fillOpacity="0.08" stroke="#1B2A4E" strokeOpacity="0.4" strokeWidth="0.2" />
@@ -93,45 +103,42 @@ export default function FloorMap({ seats = [], bookings = [], workingHours = [9,
           <rect x="86" y="55" width="3" height="4" fill="#1B2A4E" fillOpacity="0.25" />
           <text x="87.5" y="62" fontSize="1.6" textAnchor="middle" fill="#1B2A4E" fillOpacity="0.6" className="font-sans">Pillar</text>
 
-          {/* Cluster spines */}
-          {spines.map((l) => (
-            <line key={`spine-${l.x1}-${l.y1}-${l.x2}-${l.y2}`} x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2} stroke="#1B2A4E" strokeOpacity="0.18" strokeWidth="0.3" strokeDasharray="0.5 0.4" />
+          {/* Cluster skeletons: main spine + 4 diagonal branches per cluster */}
+          {clusters.map((c) => (
+            <g key={`cluster-${c.cid}`}>
+              {/* Main horizontal spine, extended beyond the outermost seats */}
+              <line
+                x1={c.spineStart} y1={c.spineY}
+                x2={c.spineEnd} y2={c.spineY}
+                stroke="#1B2A4E" strokeOpacity="0.4" strokeWidth="0.5" strokeLinecap="round"
+              />
+              {/* Diagonal branches from the junction to each corner seat */}
+              {c.corners.map((corner) => (
+                <line
+                  key={`branch-${corner.id}`}
+                  x1={c.junctionX} y1={c.spineY}
+                  x2={corner.position_x} y2={corner.position_y}
+                  stroke="#1B2A4E" strokeOpacity="0.35" strokeWidth="0.4" strokeLinecap="round"
+                />
+              ))}
+              {/* Junction dot for visual anchor */}
+              <circle cx={c.junctionX} cy={c.spineY} r="0.5" fill="#1B2A4E" fillOpacity="0.5" />
+            </g>
           ))}
 
-          {/* Connector lines from spine to off-spine seats */}
-          {seats.map((s) => {
-            if (s.role === "spine_left" || s.role === "spine_right") return null;
-            // Find the closest spine seat in same cluster (similar y range)
-            const nearestSpine = seats
-              .filter((x) => (x.role === "spine_left" || x.role === "spine_right") && Math.abs(x.position_y - s.position_y) < 6)
-              .sort((a, b) => Math.abs(a.position_x - s.position_x) - Math.abs(b.position_x - s.position_x))[0];
-            if (!nearestSpine) return null;
-            return (
-              <line
-                key={`c-${s.id}`}
-                x1={nearestSpine.position_x}
-                y1={nearestSpine.position_y}
-                x2={s.position_x}
-                y2={s.position_y}
-                stroke="#1B2A4E"
-                strokeOpacity="0.1"
-                strokeWidth="0.2"
-              />
-            );
-          })}
-
-          {/* Seats */}
+          {/* Seats — always circles */}
           {seats.map((seat) => {
             const c = colorFor(seat);
+            const isSelected = selectedSeatId === seat.id;
             return (
               <g key={seat.id} className="cursor-pointer" onClick={() => onSeatClick && onSeatClick(seat)} data-testid={`seat-${seat.id}`}>
                 <circle
                   cx={seat.position_x}
                   cy={seat.position_y}
-                  r={selectedSeatId === seat.id ? 2.6 : 2.2}
+                  r={isSelected ? 2.7 : 2.3}
                   fill={c.fill}
                   stroke={c.stroke}
-                  strokeWidth={selectedSeatId === seat.id ? 0.5 : 0.3}
+                  strokeWidth={isSelected ? 0.6 : 0.4}
                   className="transition-all duration-150 hover:opacity-80"
                 />
                 <text
