@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import Layout from "@/components/Layout";
-import api, { formatApiErrorDetail } from "@/lib/api";
+import api, { formatRequestError } from "@/lib/api";
 import { toast } from "sonner";
 import { Plus, AlertTriangle } from "lucide-react";
 
@@ -66,7 +66,7 @@ function CreateViolation({ users, onClose, onCreated }) {
       await api.post("/admin/violations", form);
       toast.success("Violation logged");
       onCreated();
-    } catch (e) { toast.error(formatApiErrorDetail(e.response?.data?.detail)); }
+    } catch (e) { toast.error(formatRequestError(e)); }
   };
   return (
     <div className="fixed inset-0 z-50 bg-navy/50 backdrop-blur-sm flex items-center justify-center p-4">

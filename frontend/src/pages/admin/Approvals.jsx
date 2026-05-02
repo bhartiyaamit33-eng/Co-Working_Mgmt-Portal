@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import Layout from "@/components/Layout";
-import api, { formatApiErrorDetail } from "@/lib/api";
+import api, { formatRequestError } from "@/lib/api";
 import { toast } from "sonner";
 import { Check, X } from "lucide-react";
 
@@ -18,7 +18,7 @@ export default function Approvals() {
       await api.post(`/admin/bookings/${id}/approve`);
       toast.success("Approved");
       load();
-    } catch (e) { toast.error(formatApiErrorDetail(e.response?.data?.detail)); }
+    } catch (e) { toast.error(formatRequestError(e)); }
   };
 
   const bulkApprove = async () => {

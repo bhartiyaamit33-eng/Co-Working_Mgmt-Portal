@@ -1,7 +1,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
 import Layout from "@/components/Layout";
 import FloorMap from "@/components/FloorMap";
-import api, { formatApiErrorDetail } from "@/lib/api";
+import api, { formatRequestError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 import { Clock, MapPin, X, Grid3x3, Map } from "lucide-react";
@@ -56,6 +56,10 @@ export default function Book() {
   }, [workingHours]);
 
   const onSeatClick = (seat) => {
+    if (seat.status === "maintenance" || seat.status === "blocked") {
+      toast.error("This seat is unavailable for booking.");
+      return;
+    }
     setSelectedSeat(seat);
     setDrawerHours([]);
   };
@@ -110,7 +114,7 @@ export default function Book() {
       closeDrawer();
       await loadDayBookings(date);
     } catch (e) {
-      toast.error(formatApiErrorDetail(e.response?.data?.detail) || "Failed to book");
+      toast.error(formatRequestError(e));
     } finally { setBusy(false); }
   };
 
@@ -248,7 +252,7 @@ function TimelineView({ seats, bookings, hours, selectedSeatId, onCellClick }) {
     if (!b) return "free";
     return b.status === "approved" ? "approved" : "pending";
   };
-  const seat = (id) => seats.find((s) => s.id === id);
+  const seatBlocked = (s) => s.status === "maintenance" || s.status === "blocked";
   return (
     <div className="dsse-card p-4 sm:p-6 overflow-x-auto">
       <span className="label-eyebrow mb-3 block">Timeline · seat × hour</span>
@@ -262,14 +266,16 @@ function TimelineView({ seats, bookings, hours, selectedSeatId, onCellClick }) {
               {hours.map((h) => {
                 const st = cellState(s.id, h);
                 const isSel = selectedSeatId === s.id;
-                const cls = st === "free" ? "bg-emerald-50 hover:bg-amber/20 cursor-pointer" :
+                const blocked = seatBlocked(s);
+                const cls = blocked ? "bg-slate-200 cursor-not-allowed" :
+                  st === "free" ? "bg-emerald-50 hover:bg-amber/20 cursor-pointer" :
                   st === "approved" ? "bg-red-100 cursor-not-allowed" :
                   "bg-amber/30 cursor-not-allowed";
                 return (
                   <div
                     key={`${s.id}-${h}`}
                     className={`m-0.5 h-6 rounded ${cls} ${isSel ? "ring-2 ring-amber" : ""} transition-colors`}
-                    onClick={() => st === "free" && onCellClick(s)}
+                    onClick={() => !blocked && st === "free" && onCellClick(s)}
                     data-testid={`tl-${s.id}-${h}`}
                   />
                 );

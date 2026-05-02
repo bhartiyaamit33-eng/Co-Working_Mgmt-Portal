@@ -1,20 +1,16 @@
 import { Link } from "react-router-dom";
 
-const LOGO_URL = "https://customer-assets.emergentagent.com/job_iit-workspace/artifacts/rjs3gpn9_image.png";
+/** Official DSSE wordmark — preserve PNG colors (white DSS, multicolor E, black plate). */
+const LOGO_URL = `${process.env.PUBLIC_URL}/logo.png`;
 
 /**
- * DSSE Logo — official monochrome mark from Desai Sethi School of Entrepreneurship.
- * Variants:
- *   - "default" : black logo for light backgrounds
- *   - "white"   : inverted (white) for navy backgrounds
- *   - "navy"    : tinted navy for branded backgrounds (uses CSS filter)
+ * DSSE Logo — Desai Sethi School of Entrepreneurship (public/logo.png).
+ * No CSS filters — colors match the asset exactly.
+ * variant is kept for API compatibility (default | white | navy); all use the same colors (no filters).
  * size: tailwind h-* class (e.g., "h-8")
  */
 export default function Logo({ to = "/", variant = "default", size = "h-8", className = "", showText = false }) {
-  const filter =
-    variant === "white" ? "invert(1) brightness(2)" :
-    variant === "navy" ? "brightness(0) saturate(100%) invert(15%) sepia(25%) saturate(1700%) hue-rotate(199deg) brightness(95%) contrast(95%)" :
-    "none";
+  const filter = { default: "none", white: "none", navy: "none" }[variant] ?? "none";
 
   const inner = (
     <span className={`inline-flex items-center gap-2 ${className}`}>

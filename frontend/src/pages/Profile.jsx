@@ -1,6 +1,6 @@
 import { useState } from "react";
 import Layout from "@/components/Layout";
-import api, { formatApiErrorDetail } from "@/lib/api";
+import api, { formatRequestError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
 
@@ -17,7 +17,7 @@ export default function Profile() {
       await refreshMe();
       toast.success("Profile updated");
     } catch (e) {
-      toast.error(formatApiErrorDetail(e.response?.data?.detail));
+      toast.error(formatRequestError(e));
     } finally { setBusy(false); }
   };
 
@@ -28,7 +28,7 @@ export default function Profile() {
       setPwd({ current_password: "", new_password: "" });
       toast.success("Password changed");
     } catch (e) {
-      toast.error(formatApiErrorDetail(e.response?.data?.detail));
+      toast.error(formatRequestError(e));
     } finally { setBusy(false); }
   };
 

@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import Layout from "@/components/Layout";
-import api, { formatApiErrorDetail } from "@/lib/api";
+import api, { formatRequestError } from "@/lib/api";
 import { toast } from "sonner";
-import { Plus, Check, X } from "lucide-react";
+import { Plus, Upload } from "lucide-react";
 
 export default function AdminUsers() {
   const [users, setUsers] = useState([]);
@@ -10,6 +10,7 @@ export default function AdminUsers() {
   const [filterRole, setFilterRole] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
   const [showCreate, setShowCreate] = useState(false);
+  const [showImportCsv, setShowImportCsv] = useState(false);
   const [approving, setApproving] = useState(null);
   const [approvalForm, setApprovalForm] = useState({ team_id: "", role: "member" });
 
@@ -29,7 +30,7 @@ export default function AdminUsers() {
       toast.success("Approved");
       setApproving(null); setApprovalForm({ team_id: "", role: "member" });
       load();
-    } catch (e) { toast.error(formatApiErrorDetail(e.response?.data?.detail)); }
+    } catch (e) { toast.error(formatRequestError(e)); }
   };
 
   const reject = async (u) => {
@@ -48,7 +49,16 @@ export default function AdminUsers() {
 
   return (
     <Layout title="Users" subtitle="Account management"
-      actions={<button className="btn-accent" onClick={() => setShowCreate(true)} data-testid="create-user-btn"><Plus className="w-4 h-4" /> New user</button>}>
+      actions={(
+        <div className="flex flex-wrap gap-2 justify-end">
+          <button type="button" className="btn-outline" onClick={() => setShowImportCsv(true)} data-testid="import-csv-btn">
+            <Upload className="w-4 h-4" /> Import CSV
+          </button>
+          <button type="button" className="btn-accent" onClick={() => setShowCreate(true)} data-testid="create-user-btn">
+            <Plus className="w-4 h-4" /> New user
+          </button>
+        </div>
+      )}>
       <div className="flex flex-wrap gap-2 mb-4">
         <select className="input-field max-w-xs" value={filterRole} onChange={(e) => setFilterRole(e.target.value)} data-testid="filter-role">
           <option value="">All roles</option>
@@ -110,6 +120,8 @@ export default function AdminUsers() {
 
       {showCreate && <CreateUserModal teams={teams} onClose={() => setShowCreate(false)} onCreated={() => { setShowCreate(false); load(); }} />}
 
+      {showImportCsv && <ImportUsersCsvModal onClose={() => setShowImportCsv(false)} onDone={() => { setShowImportCsv(false); load(); }} />}
+
       {approving && (
         <div className="fixed inset-0 z-50 bg-navy/50 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white rounded-xl max-w-md w-full p-6">
@@ -143,6 +155,71 @@ export default function AdminUsers() {
   );
 }
 
+const CSV_USER_TEMPLATE = `email,first_name,last_name,initial_password,role,team_id,roll_number,phone
+student1@iitb.ac.in,Asha,Kumar,TempPass123,member,,
+student2@iitb.ac.in,Rohan,Singh,TempPass456,team_lead,,
+`;
+
+function ImportUsersCsvModal({ onClose, onDone }) {
+  const [busy, setBusy] = useState(false);
+
+  const downloadTemplate = () => {
+    const blob = new Blob([CSV_USER_TEMPLATE], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "users-import-template.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const onFile = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setBusy(true);
+    try {
+      const body = new FormData();
+      body.append("file", file);
+      const { data } = await api.post("/admin/users/import-csv", body);
+      toast.success(`Imported ${data.created} user(s).`);
+      if (data.skipped?.length) toast.info(`${data.skipped.length} email(s) skipped (already registered).`);
+      if (data.errors?.length) data.errors.slice(0, 5).forEach((msg) => toast.error(msg));
+      if (data.errors?.length > 5) toast.error(`…and ${data.errors.length - 5} more row errors (see console).`);
+      if (data.errors?.length) console.warn("CSV import errors:", data.errors);
+      onDone();
+    } catch (err) {
+      toast.error(formatRequestError(err));
+    } finally {
+      setBusy(false);
+      e.target.value = "";
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-navy/50 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl max-w-lg w-full p-6">
+        <span className="label-eyebrow">Bulk invite</span>
+        <h3 className="font-serif text-xl text-navy mt-2">Import users from CSV</h3>
+        <p className="text-sm text-slate-600 mt-2 leading-relaxed">
+          Required columns: <strong>email</strong>, <strong>first_name</strong>, <strong>last_name</strong>, and <strong>initial_password</strong> (or <strong>password</strong>).
+          Optional: <strong>role</strong> (member, team_lead, admin), <strong>team_id</strong>, roll_number, phone.
+        </p>
+        <div className="flex flex-wrap gap-2 mt-4">
+          <button type="button" className="btn-outline text-sm" onClick={downloadTemplate} data-testid="csv-download-template">Download template</button>
+          <label className="btn-accent text-sm cursor-pointer inline-flex items-center gap-2">
+            <Upload className="w-4 h-4" />
+            {busy ? "Uploading…" : "Choose CSV"}
+            <input type="file" accept=".csv,text/csv" className="hidden" disabled={busy} onChange={onFile} data-testid="csv-file-input" />
+          </label>
+        </div>
+        <div className="flex justify-end mt-6">
+          <button type="button" className="btn-outline" onClick={onClose}>Close</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function CreateUserModal({ teams, onClose, onCreated }) {
   const [form, setForm] = useState({ email: "", first_name: "", last_name: "", role: "member", initial_password: "", team_id: "" });
   const [busy, setBusy] = useState(false);
@@ -155,7 +232,7 @@ function CreateUserModal({ teams, onClose, onCreated }) {
       toast.success("User created");
       onCreated();
     } catch (e) {
-      toast.error(formatApiErrorDetail(e.response?.data?.detail));
+      toast.error(formatRequestError(e));
     } finally { setBusy(false); }
   };
   return (

@@ -4,7 +4,7 @@ import pytest
 import requests
 from datetime import datetime, timezone, timedelta, date
 
-BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "https://iit-workspace.preview.emergentagent.com").rstrip("/")
+BASE_URL = os.environ.get("REACT_APP_BACKEND_URL", "http://127.0.0.1:8000").rstrip("/")
 API = f"{BASE_URL}/api"
 
 SUPER_ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "ideas.iitb@gmail.com")

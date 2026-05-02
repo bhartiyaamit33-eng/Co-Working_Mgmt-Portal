@@ -19,10 +19,10 @@ export default function Landing() {
 
       {/* Hero */}
       <section className="relative overflow-hidden">
-        <div className="absolute inset-0 -z-10 opacity-[0.07]" style={{
-          backgroundImage: 'url(https://static.prod-images.emergentagent.com/jobs/d19453aa-87a6-432f-a816-efd987357bd2/images/4b044e7dbc9807af5dcc854862ddfaeef5621131ad58edc4abccf8e6592568ff.png)',
-          backgroundSize: 'cover', backgroundPosition: 'center'
-        }} />
+        <div
+          className="absolute inset-0 -z-10 bg-gradient-to-br from-navy/[0.08] via-transparent to-amber-600/[0.06]"
+          aria-hidden
+        />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-24 grid lg:grid-cols-12 gap-8 items-center">
           <div className="lg:col-span-7">
             <span className="label-eyebrow text-amber-700">Desai Sethi School of Entrepreneurship</span>
@@ -165,7 +165,8 @@ function FloorPreview() {
               ))}
             </g>
           ))}
-          <rect x="86" y="55" width="3" height="4" fill="#1B2A4E" fillOpacity="0.25" />
+          {/* Pillar between seats 22 & 23 (matches live floor map) */}
+          <rect x="74.05" y="56.8" width="2.9" height="5.4" rx="0.35" fill="#1B2A4E" fillOpacity="0.25" />
         </svg>
       </div>
       <p className="text-xs text-slate-500 mt-3 leading-relaxed">

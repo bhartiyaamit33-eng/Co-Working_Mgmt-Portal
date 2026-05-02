@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import Layout from "@/components/Layout";
-import api, { formatApiErrorDetail } from "@/lib/api";
+import api, { formatRequestError } from "@/lib/api";
 import { toast } from "sonner";
 
 export default function AdminConfiguration() {
@@ -31,7 +31,7 @@ export default function AdminConfiguration() {
         auto_approve_programs: cfg.auto_approve_programs,
       });
       toast.success("Configuration saved");
-    } catch (e) { toast.error(formatApiErrorDetail(e.response?.data?.detail)); }
+    } catch (e) { toast.error(formatRequestError(e)); }
     finally { setBusy(false); }
   };
 

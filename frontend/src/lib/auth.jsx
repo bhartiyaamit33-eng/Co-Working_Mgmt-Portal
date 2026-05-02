@@ -1,5 +1,10 @@
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
-import api, { formatApiErrorDetail } from "./api";
+import api, {
+  formatApiErrorDetail,
+  formatRequestError,
+  setSessionAccessToken,
+  clearSessionAccessToken,
+} from "./api";
 
 const AuthContext = createContext(null);
 
@@ -30,8 +35,16 @@ export function AuthProvider({ children }) {
   }, [refreshMe]);
 
   const login = async (email, password) => {
-    await api.post("/auth/login", { email, password });
-    return await refreshMe();
+    const { data } = await api.post("/auth/login", { email, password });
+    if (data?.token) setSessionAccessToken(data.token);
+    const u = await refreshMe();
+    if (!u) {
+      clearSessionAccessToken();
+      throw new Error(
+        "Could not establish a session after login. Open the app at http://localhost:3000 with the API at http://localhost:8000.",
+      );
+    }
+    return u;
   };
 
   const signup = async (payload) => {
@@ -46,6 +59,7 @@ export function AuthProvider({ children }) {
       // eslint-disable-next-line no-console
       console.error("logout failed:", e);
     }
+    clearSessionAccessToken();
     setUser(false);
     setTeam(null);
   };
@@ -58,4 +72,4 @@ export function AuthProvider({ children }) {
 }
 
 export const useAuth = () => useContext(AuthContext);
-export { formatApiErrorDetail };
+export { formatApiErrorDetail, formatRequestError };

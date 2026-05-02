@@ -15,7 +15,7 @@ from typing import Optional, List, Literal
 from fastapi import FastAPI, APIRouter, Depends, HTTPException, Request, Response, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
-from pydantic import BaseModel, Field, EmailStr, ConfigDict
+from pydantic import BaseModel, Field, EmailStr, ConfigDict, TypeAdapter, ValidationError
 
 from auth import (
     hash_password, verify_password, create_access_token, create_refresh_token,
@@ -25,6 +25,9 @@ from auth import (
 from seed import run_seed
 
 logging.basicConfig(level=logging.INFO)
+
+ALLOWED_BULK_USER_ROLES = frozenset({"member", "team_lead", "admin"})
+_csv_email_adapter = TypeAdapter(EmailStr)
 logger = logging.getLogger("dsse")
 
 # ---------- DB ----------
@@ -174,7 +177,7 @@ class GuidelinesAccept(BaseModel):
 
 
 class SeatUpdate(BaseModel):
-    status: Optional[Literal["available", "maintenance"]] = None
+    status: Optional[Literal["available", "maintenance", "blocked"]] = None
     zone: Optional[str] = None
     position_x: Optional[float] = None
     position_y: Optional[float] = None
@@ -271,12 +274,14 @@ async def validate_booking(user: dict, payload: BookingIn) -> tuple[dict, dict]:
     if start_ist.date() > today_ist + timedelta(days=cfg["booking_window_days"]):
         raise HTTPException(400, f"Cannot book more than {cfg['booking_window_days']} days ahead.")
 
-    # Seat existence + maintenance
+    # Seat existence + availability
     seat = await db.seats.find_one({"id": payload.seat_id}, {"_id": 0})
     if not seat:
         raise HTTPException(404, "Seat not found.")
     if seat["status"] == "maintenance":
         raise HTTPException(400, "Seat is under maintenance.")
+    if seat["status"] == "blocked":
+        raise HTTPException(400, "This seat is not available for booking.")
 
     # Overlap on same seat (pending/approved)
     overlap = await db.bookings.find_one({
@@ -517,6 +522,115 @@ async def admin_create_user(payload: UserCreateAdmin, _: dict = Depends(require_
         })
     await notify(uid, "Welcome to DSSE Booking", f"Your account has been created. Initial password: {payload.initial_password}", "info")
     return {"ok": True, "id": uid}
+
+
+def _norm_csv_header(key: str) -> str:
+    return key.strip().lower().replace(" ", "_")
+
+
+@api.post("/admin/users/import-csv")
+async def admin_import_users_csv(file: UploadFile = File(...), _: dict = Depends(require_admin)):
+    """Bulk-create users from CSV. Required columns: email, first_name, last_name, initial_password (or password).
+    Optional: role (member|team_lead|admin), team_id, roll_number, phone."""
+    try:
+        raw_bytes = await file.read()
+        text = raw_bytes.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        raise HTTPException(400, "File must be UTF-8 CSV.")
+
+    reader = csv.DictReader(io.StringIO(text))
+    if not reader.fieldnames:
+        raise HTTPException(400, "CSV has no header row.")
+
+    header_map = {_norm_csv_header(h): h for h in reader.fieldnames}
+
+    def pick(row: dict, *aliases: str) -> str:
+        for a in aliases:
+            nk = _norm_csv_header(a)
+            if nk in header_map:
+                v = row.get(header_map[nk])
+                return (v or "").strip()
+        return ""
+
+    if "email" not in header_map:
+        raise HTTPException(400, "CSV must include an email column.")
+    if "first_name" not in header_map:
+        raise HTTPException(400, "CSV must include first_name column.")
+    if "last_name" not in header_map:
+        raise HTTPException(400, "CSV must include last_name column.")
+    if "initial_password" not in header_map and "password" not in header_map:
+        raise HTTPException(400, "CSV must include initial_password or password column.")
+
+    created = 0
+    errors: List[str] = []
+    skipped: List[str] = []
+
+    for line_no, row in enumerate(reader, start=2):
+        email = pick(row, "email").lower()
+        first_name = pick(row, "first_name")
+        last_name = pick(row, "last_name")
+        initial_password = pick(row, "initial_password", "password")
+        role = pick(row, "role") or "member"
+        team_id = pick(row, "team_id") or None
+        roll_number = pick(row, "roll_number") or ""
+        phone = pick(row, "phone") or ""
+
+        if not email:
+            errors.append(f"Row {line_no}: missing email")
+            continue
+        try:
+            _csv_email_adapter.validate_python(email)
+        except ValidationError:
+            errors.append(f"Row {line_no}: invalid email {email!r}")
+            continue
+        if not first_name or not last_name:
+            errors.append(f"Row {line_no}: missing first_name or last_name")
+            continue
+        if len(initial_password) < 6:
+            errors.append(f"Row {line_no}: password must be at least 6 characters")
+            continue
+        if role not in ALLOWED_BULK_USER_ROLES:
+            errors.append(f"Row {line_no}: role must be one of {', '.join(sorted(ALLOWED_BULK_USER_ROLES))}")
+            continue
+
+        if await db.users.find_one({"email": email}):
+            skipped.append(email)
+            continue
+
+        uid = str(uuid.uuid4())
+        doc = {
+            "id": uid,
+            "email": email,
+            "password_hash": hash_password(initial_password),
+            "first_name": first_name,
+            "last_name": last_name,
+            "roll_number": roll_number,
+            "phone": phone,
+            "role": role,
+            "status": "active",
+            "guidelines_accepted_version": None,
+            "created_at": utcnow_iso(),
+            "updated_at": utcnow_iso(),
+        }
+        await db.users.insert_one(doc)
+
+        if team_id:
+            team = await db.teams.find_one({"id": team_id})
+            if team:
+                await db.team_memberships.insert_one({
+                    "id": str(uuid.uuid4()),
+                    "user_id": uid,
+                    "team_id": team_id,
+                    "role_in_team": role if role in ("team_lead", "member") else "member",
+                    "joined_at": utcnow_iso(),
+                    "left_at": None,
+                })
+            else:
+                errors.append(f"Row {line_no}: team_id not found for {email} — user created without team")
+
+        created += 1
+
+    return {"created": created, "skipped": skipped, "errors": errors}
 
 
 @api.post("/admin/users/{user_id}/approve")
@@ -1015,10 +1129,16 @@ async def export_csv(_: dict = Depends(require_admin)):
 # ---------- Mount ----------
 app.include_router(api)
 
+# Browsers reject credentialed requests when Allow-Origin is *. List dev/prod origins explicitly.
+_cors_raw = os.environ.get(
+    "CORS_ORIGINS",
+    "http://localhost:3000,http://127.0.0.1:3000",
+)
+_cors_origins = [o.strip() for o in _cors_raw.split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
-    allow_origins=["*"],
+    allow_origins=_cors_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )

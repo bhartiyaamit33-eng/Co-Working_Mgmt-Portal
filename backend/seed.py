@@ -145,9 +145,13 @@ async def run_seed(db, hash_password_fn):
             })
         await db.seats.insert_many(docs)
 
-    # 2. Super admin
+    # Clear any legacy blocked flag on seats 4 & 18 so they stay bookable.
+    await db.seats.update_many({"id": {"$in": [4, 18]}}, {"$set": {"status": "available"}})
+
+    # 2. Super admin (ideas.iitb@gmail.com / Admin@123 by default)
     admin_email = os.environ.get("ADMIN_EMAIL", "ideas.iitb@gmail.com").lower()
     admin_password = os.environ.get("ADMIN_PASSWORD", "Admin@123")
+    sync_admin = os.environ.get("ADMIN_SYNC_ON_START", "").lower() in ("1", "true", "yes")
     existing = await db.users.find_one({"email": admin_email})
     if not existing:
         await db.users.insert_one({
@@ -164,6 +168,19 @@ async def run_seed(db, hash_password_fn):
             "created_at": now.isoformat(),
             "updated_at": now.isoformat(),
         })
+    elif sync_admin:
+        # Use when this email was already used (e.g. applicant signup) or password unknown locally.
+        await db.users.update_one(
+            {"email": admin_email},
+            {"$set": {
+                "password_hash": hash_password_fn(admin_password),
+                "first_name": "DSSE",
+                "last_name": "Admin",
+                "role": "super_admin",
+                "status": "active",
+                "updated_at": now.isoformat(),
+            }},
+        )
 
     # 3. Guidelines (one active version)
     if await db.guidelines.count_documents({}) == 0:

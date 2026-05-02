@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useAuth, formatApiErrorDetail } from "@/lib/auth";
+import { useAuth, formatRequestError } from "@/lib/auth";
 import { AuthShell } from "./Login";
 import { toast } from "sonner";
 
@@ -22,7 +22,7 @@ export default function Signup() {
       setDone(true);
       toast.success("Application submitted!");
     } catch (e) {
-      setErr(formatApiErrorDetail(e.response?.data?.detail) || e.message);
+      setErr(formatRequestError(e));
     } finally { setBusy(false); }
   };
 

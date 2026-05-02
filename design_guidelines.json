@@ -106,14 +106,14 @@
   },
   "media": {
     "hero_network_bg": {
-      "url": "https://static.prod-images.emergentagent.com/jobs/d19453aa-87a6-432f-a816-efd987357bd2/images/4b044e7dbc9807af5dcc854862ddfaeef5621131ad58edc4abccf8e6592568ff.png",
+      "url": "",
       "category": "landing_page_hero",
-      "description": "Abstract 3D network of workstations. Use this in the hero section of the landing page, with an overlay of bg-[#FAFAF7]/80 to keep it subtle and allow the Source Serif 4 typography to pop."
+      "description": "Subtle gradient (navy/amber) or a local static asset under public/; keep contrast high for Source Serif headings."
     },
     "coworking_floor_abstract": {
-      "url": "https://static.prod-images.emergentagent.com/jobs/d19453aa-87a6-432f-a816-efd987357bd2/images/d4400619bc046da56df272c8e719d92604f2af0998fc351bf0bb87bbd6da5406.png",
+      "url": "",
       "category": "marketing_feature",
-      "description": "Clean architectural rendering. Use this next to the 'How it works' or 'About the Space' section on the landing page."
+      "description": "Optional local illustration next to 'How it works' or 'About the Space' — add under public/ when available."
     },
     "students_collaborating": {
       "url": "https://images.unsplash.com/photo-1758270705172-07b53627dfcb?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NTYxODh8MHwxfHNlYXJjaHwzfHxzdHVkZW50cyUyMGNvbGxhYm9yYXRpbmclMjBsYXB0b3B8ZW58MHx8fHwxNzc3NTQyMDk1fDA&ixlib=rb-4.1.0&q=85",

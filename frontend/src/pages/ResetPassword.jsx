@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { AuthShell } from "./Login";
-import api, { formatApiErrorDetail } from "@/lib/api";
+import api, { formatRequestError } from "@/lib/api";
 import { toast } from "sonner";
 
 export default function ResetPassword() {
@@ -20,7 +20,7 @@ export default function ResetPassword() {
       toast.success("Password updated. Please log in.");
       nav("/login");
     } catch (e) {
-      setErr(formatApiErrorDetail(e.response?.data?.detail) || e.message);
+      setErr(formatRequestError(e));
     } finally { setBusy(false); }
   };
 

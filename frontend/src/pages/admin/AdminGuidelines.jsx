@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import Layout from "@/components/Layout";
-import api, { formatApiErrorDetail } from "@/lib/api";
+import api, { formatRequestError } from "@/lib/api";
 import { Markdown } from "@/pages/GuidelinesPublic";
 import { toast } from "sonner";
 import { Plus } from "lucide-react";
@@ -57,7 +57,7 @@ function CreateGuidelines({ onClose, onCreated }) {
       await api.post("/admin/guidelines", form);
       toast.success("Guidelines created");
       onCreated();
-    } catch (e) { toast.error(formatApiErrorDetail(e.response?.data?.detail)); }
+    } catch (e) { toast.error(formatRequestError(e)); }
   };
   return (
     <div className="fixed inset-0 z-50 bg-navy/50 backdrop-blur-sm flex items-center justify-center p-4">

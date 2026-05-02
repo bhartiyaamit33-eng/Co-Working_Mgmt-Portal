@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Layout from "@/components/Layout";
-import api, { formatApiErrorDetail } from "@/lib/api";
+import api, { formatRequestError } from "@/lib/api";
 import { toast } from "sonner";
 import { Plus, Upload } from "lucide-react";
 
@@ -66,7 +66,7 @@ function CreateTeam({ onClose, onCreated }) {
       await api.post("/admin/teams", form);
       toast.success("Team created");
       onCreated();
-    } catch (e) { toast.error(formatApiErrorDetail(e.response?.data?.detail)); }
+    } catch (e) { toast.error(formatRequestError(e)); }
   };
   return (
     <Modal title="Create team" onClose={onClose}>

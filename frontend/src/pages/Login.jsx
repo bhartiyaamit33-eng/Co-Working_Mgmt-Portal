@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { useAuth, formatApiErrorDetail } from "@/lib/auth";
+import { useAuth, formatRequestError } from "@/lib/auth";
 import Logo from "@/components/Logo";
 import { toast } from "sonner";
 import { ArrowRight } from "lucide-react";
@@ -20,12 +20,12 @@ export default function Login() {
     setBusy(true); setErr("");
     try {
       const u = await login(email, password);
-      if (!u) throw new Error("Login failed");
+      if (!u) throw new Error("Login incomplete.");
       if (["super_admin", "admin"].includes(u.role)) nav("/admin");
       else nav("/dashboard");
       toast.success("Welcome back.");
     } catch (e) {
-      setErr(formatApiErrorDetail(e.response?.data?.detail) || e.message);
+      setErr(formatRequestError(e));
     } finally { setBusy(false); }
   };
 

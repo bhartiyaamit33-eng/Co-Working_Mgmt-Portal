@@ -1,8 +1,6 @@
 import { useMemo } from "react";
 
 // Map a seat number (1-55) to its cluster id (1-10).
-// Right column (top→bottom): 1-6, 7-12, 13-18, 19-23 (pillar/5 seats), 24-29, 30-35
-// Left column (top→bottom near gate first): 51-55, 46-50, 41-45, 36-40
 const clusterOf = (id) => {
   if (id <= 6) return 1;
   if (id <= 12) return 2;
@@ -16,19 +14,54 @@ const clusterOf = (id) => {
   return 7;
 };
 
+/** Seat circle radius in viewBox units (matches rendered circles below). */
+const SEAT_R = 2.3;
+/** Clear gap between table line end and seat circle — reads as table edge, not intersecting chair. */
+const TABLE_GAP = 1.2;
+/** Short offset from cluster hub so spokes radiate cleanly from centre. */
+const HUB_INSET = 1.05;
+
 /**
- * FloorMap — renders the 55-seat fishbone layout as an interactive SVG.
- * Each cluster is drawn with a clear skeleton:
- *  - a main horizontal spine that extends beyond the outermost seats
- *  - 4 diagonal branches from a central junction to each corner seat
- * Seats are always circles regardless of role.
+ * Table spoke from hub toward a seat centre, clipped so it stops outside the seat circle (tangent-like gap).
  */
-export default function FloorMap({ seats = [], bookings = [], workingHours = [9, 18], selectedSeatId, onSeatClick }) {
+function clippedTableBranch(jx, jy, tx, ty) {
+  const dx = tx - jx;
+  const dy = ty - jy;
+  const len = Math.hypot(dx, dy);
+  if (len < 0.05) return null;
+  const ux = dx / len;
+  const uy = dy / len;
+  const x1 = jx + ux * HUB_INSET;
+  const y1 = jy + uy * HUB_INSET;
+  const x2 = tx - ux * (SEAT_R + TABLE_GAP);
+  const y2 = ty - uy * (SEAT_R + TABLE_GAP);
+  const spokeLen = (x2 - x1) * ux + (y2 - y1) * uy;
+  if (spokeLen < 0.35) return null;
+  return { x1, y1, x2, y2 };
+}
+
+/**
+ * FloorMap — 4th floor DSSE fishbone. Circles = chairs; lines = table legs/spines (never drawn through chairs).
+ */
+export default function FloorMap({
+  seats = [],
+  bookings = [],
+  workingHours = [9, 18],
+  selectedSeatId,
+  onSeatClick,
+  /** When true (admin seats UI), maintenance/blocked seats remain clickable so status can be toggled. */
+  allowLockedSeatSelection = false,
+}) {
   const totalHours = workingHours[1] - workingHours[0];
 
   const seatStatus = useMemo(() => {
     const status = {};
-    for (const s of seats) status[s.id] = { hours: 0, maintenance: s.status === "maintenance" };
+    for (const s of seats) {
+      status[s.id] = {
+        hours: 0,
+        unavailable: s.status === "maintenance" || s.status === "blocked",
+      };
+    }
     for (const b of bookings) {
       const start = new Date(b.start_time);
       const end = new Date(b.end_time);
@@ -42,13 +75,12 @@ export default function FloorMap({ seats = [], bookings = [], workingHours = [9,
     if (selectedSeatId === seat.id) return { fill: "#E8A33D", stroke: "#1B2A4E", text: "#1B2A4E" };
     const st = seatStatus[seat.id];
     if (!st) return { fill: "#fff", stroke: "#1B2A4E33", text: "#1B2A4E" };
-    if (st.maintenance) return { fill: "#E5E7EB", stroke: "#94A3B8", text: "#64748B" };
+    if (st.unavailable) return { fill: "#E5E7EB", stroke: "#94A3B8", text: "#64748B" };
     if (st.hours === 0) return { fill: "#ECFDF5", stroke: "#298F4A", text: "#1B2A4E" };
     if (st.hours >= totalHours) return { fill: "#FEF2F2", stroke: "#D93838", text: "#1B2A4E" };
     return { fill: "#FEF6E7", stroke: "#E8A33D", text: "#1B2A4E" };
   };
 
-  // Build cluster geometry: spine + 4 diagonal branches per cluster.
   const clusters = useMemo(() => {
     const groups = {};
     for (const s of seats) {
@@ -60,78 +92,129 @@ export default function FloorMap({ seats = [], bookings = [], workingHours = [9,
       const corners = members.filter((s) => s.role && !s.role.startsWith("spine"));
       if (spineSeats.length === 0 || corners.length === 0) return null;
       const spineY = spineSeats[0].position_y;
-      // Junction sits at the midpoint of the corner seats' X coordinates, on the spine line.
       const junctionX = corners.reduce((sum, s) => sum + s.position_x, 0) / corners.length;
-      const minX = Math.min(...members.map((s) => s.position_x));
-      const maxX = Math.max(...members.map((s) => s.position_x));
-      // Extend the spine 4 units past the outermost seats so the skeleton is visible.
       return {
-        cid: parseInt(cid),
+        cid: parseInt(cid, 10),
         spineY,
         junctionX,
-        spineStart: minX - 4,
-        spineEnd: maxX + 4,
+        spineSeats,
         corners,
       };
     }).filter(Boolean);
   }, [seats]);
 
+  const isSeatLocked = (seat) => seat.status === "maintenance" || seat.status === "blocked";
+  const clickBlocked = (seat) => isSeatLocked(seat) && !allowLockedSeatSelection;
+
+  /** Pillar for cluster with seats 19–23: draw between #22 and #23 from layout data. */
+  const pillarLayout = useMemo(() => {
+    const s22 = seats.find((s) => s.id === 22);
+    const s23 = seats.find((s) => s.id === 23);
+    const w = 2.9;
+    const h = 5.4;
+    if (s22 && s23) {
+      const mx = (s22.position_x + s23.position_x) / 2;
+      const my = (s22.position_y + s23.position_y) / 2;
+      return { x: mx - w / 2, y: my - h / 2, w, h, lx: mx, ly: my + h / 2 + 2.2 };
+    }
+    return { x: 74.05, y: 56.8, w, h, lx: 75.5, ly: 64.5 };
+  }, [seats]);
+
   return (
     <div className="relative w-full bg-white rounded-xl border border-navy/10 p-4 sm:p-6">
       <div className="flex items-center justify-between mb-3">
-        <span className="label-eyebrow">Floor Plan · 4th Floor, DSSE Building</span>
+        <span className="label-eyebrow">Floor plan · 4th floor, DSSE building</span>
         <Legend />
       </div>
       <div className="relative w-full" style={{ aspectRatio: "10 / 12" }}>
         <svg viewBox="0 0 100 100" className="w-full h-full" data-testid="floor-map-svg">
-          {/* Outer floor outline */}
           <rect x="2" y="2" width="96" height="96" rx="2" fill="#FAFAF7" stroke="#1B2A4E" strokeOpacity="0.15" strokeWidth="0.3" />
 
-          {/* Gate (top-left) */}
           <g>
             <rect x="6" y="4" width="12" height="6" rx="1" fill="#1B2A4E" fillOpacity="0.08" stroke="#1B2A4E" strokeOpacity="0.4" strokeWidth="0.2" />
             <text x="12" y="8" fontSize="2.2" textAnchor="middle" fill="#1B2A4E" className="font-sans font-medium">GATE</text>
-            <line x1="18" y1="7" x2="22" y2="7" stroke="#1B2A4E" strokeOpacity="0.5" strokeWidth="0.4" markerEnd="url(#arrow)" />
+            <line x1="18" y1="7" x2="22" y2="7" stroke="#1B2A4E" strokeOpacity="0.5" strokeWidth="0.4" markerEnd="url(#floor-arrow)" />
           </g>
           <defs>
-            <marker id="arrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+            <marker id="floor-arrow" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
               <path d="M0,0 L0,6 L6,3 z" fill="#1B2A4E" fillOpacity="0.5" />
             </marker>
           </defs>
 
-          {/* Pillar */}
-          <rect x="86" y="55" width="3" height="4" fill="#1B2A4E" fillOpacity="0.25" />
-          <text x="87.5" y="62" fontSize="1.6" textAnchor="middle" fill="#1B2A4E" fillOpacity="0.6" className="font-sans">Pillar</text>
+          <rect
+            x={pillarLayout.x}
+            y={pillarLayout.y}
+            width={pillarLayout.w}
+            height={pillarLayout.h}
+            rx="0.35"
+            fill="#1B2A4E"
+            fillOpacity="0.25"
+          />
+          <text
+            x={pillarLayout.lx}
+            y={pillarLayout.ly}
+            fontSize="1.6"
+            textAnchor="middle"
+            fill="#1B2A4E"
+            fillOpacity="0.6"
+            className="font-sans"
+          >
+            Pillar
+          </text>
 
-          {/* Cluster skeletons: main spine + 4 diagonal branches per cluster */}
           {clusters.map((c) => (
             <g key={`cluster-${c.cid}`}>
-              {/* Main horizontal spine, extended beyond the outermost seats */}
-              <line
-                x1={c.spineStart} y1={c.spineY}
-                x2={c.spineEnd} y2={c.spineY}
-                stroke="#1B2A4E" strokeOpacity="0.4" strokeWidth="0.5" strokeLinecap="round"
-              />
-              {/* Diagonal branches from the junction to each corner seat */}
-              {c.corners.map((corner) => (
-                <line
-                  key={`branch-${corner.id}`}
-                  x1={c.junctionX} y1={c.spineY}
-                  x2={corner.position_x} y2={corner.position_y}
-                  stroke="#1B2A4E" strokeOpacity="0.35" strokeWidth="0.4" strokeLinecap="round"
-                />
-              ))}
-              {/* Junction dot for visual anchor */}
-              <circle cx={c.junctionX} cy={c.spineY} r="0.5" fill="#1B2A4E" fillOpacity="0.5" />
+              {/* Hub — tables radiate from here; spokes stop short of chair circles */}
+              <circle cx={c.junctionX} cy={c.spineY} r="0.45" fill="#1B2A4E" fillOpacity="0.35" />
+              {c.corners.map((seat) => {
+                const seg = clippedTableBranch(c.junctionX, c.spineY, seat.position_x, seat.position_y);
+                if (!seg) return null;
+                return (
+                  <line
+                    key={`tb-${seat.id}`}
+                    x1={seg.x1}
+                    y1={seg.y1}
+                    x2={seg.x2}
+                    y2={seg.y2}
+                    stroke="#1B2A4E"
+                    strokeOpacity="0.38"
+                    strokeWidth="0.42"
+                    strokeLinecap="round"
+                  />
+                );
+              })}
+              {c.spineSeats.map((seat) => {
+                const seg = clippedTableBranch(c.junctionX, c.spineY, seat.position_x, seat.position_y);
+                if (!seg) return null;
+                return (
+                  <line
+                    key={`ts-${seat.id}`}
+                    x1={seg.x1}
+                    y1={seg.y1}
+                    x2={seg.x2}
+                    y2={seg.y2}
+                    stroke="#1B2A4E"
+                    strokeOpacity="0.38"
+                    strokeWidth="0.42"
+                    strokeLinecap="round"
+                  />
+                );
+              })}
             </g>
           ))}
 
-          {/* Seats — always circles */}
           {seats.map((seat) => {
             const c = colorFor(seat);
             const isSelected = selectedSeatId === seat.id;
+            const locked = isSeatLocked(seat);
+            const noClick = clickBlocked(seat);
             return (
-              <g key={seat.id} className="cursor-pointer" onClick={() => onSeatClick && onSeatClick(seat)} data-testid={`seat-${seat.id}`}>
+              <g
+                key={seat.id}
+                className={noClick ? "cursor-not-allowed" : "cursor-pointer"}
+                onClick={() => !noClick && onSeatClick && onSeatClick(seat)}
+                data-testid={`seat-${seat.id}`}
+              >
                 <circle
                   cx={seat.position_x}
                   cy={seat.position_y}
@@ -139,7 +222,7 @@ export default function FloorMap({ seats = [], bookings = [], workingHours = [9,
                   fill={c.fill}
                   stroke={c.stroke}
                   strokeWidth={isSelected ? 0.6 : 0.4}
-                  className="transition-all duration-150 hover:opacity-80"
+                  className={locked ? "opacity-95" : "transition-all duration-150 hover:opacity-80"}
                 />
                 <text
                   x={seat.position_x}
@@ -165,7 +248,7 @@ function Legend() {
     { label: "Available", fill: "#ECFDF5", stroke: "#298F4A" },
     { label: "Partial", fill: "#FEF6E7", stroke: "#E8A33D" },
     { label: "Full", fill: "#FEF2F2", stroke: "#D93838" },
-    { label: "Maintenance", fill: "#E5E7EB", stroke: "#94A3B8" },
+    { label: "Unavailable", fill: "#E5E7EB", stroke: "#94A3B8" },
   ];
   return (
     <div className="flex flex-wrap items-center gap-3 text-xs">

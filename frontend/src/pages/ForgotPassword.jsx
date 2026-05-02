@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { AuthShell } from "./Login";
-import api, { formatApiErrorDetail } from "@/lib/api";
+import api, { formatRequestError } from "@/lib/api";
 import { toast } from "sonner";
 
 export default function ForgotPassword() {
@@ -18,7 +18,7 @@ export default function ForgotPassword() {
       if (data.reset_token) setToken(data.reset_token);
       toast.success("If the email exists, a reset link has been sent.");
     } catch (e) {
-      setErr(formatApiErrorDetail(e.response?.data?.detail) || e.message);
+      setErr(formatRequestError(e));
     } finally { setBusy(false); }
   };
 
