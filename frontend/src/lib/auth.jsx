@@ -11,12 +11,14 @@ const AuthContext = createContext(null);
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);   // null = checking, false = not authed, object = authed
   const [team, setTeam] = useState(null);
+  const [roleInTeam, setRoleInTeam] = useState(null);
 
   const refreshMe = useCallback(async () => {
     try {
       const { data } = await api.get("/auth/me");
       setUser(data.user);
       setTeam(data.team);
+      setRoleInTeam(data.role_in_team || null);
       return data.user;
     } catch (e) {
       // 401 here is expected when not logged in — only log unexpected errors.
@@ -26,6 +28,7 @@ export function AuthProvider({ children }) {
       }
       setUser(false);
       setTeam(null);
+      setRoleInTeam(null);
       return false;
     }
   }, []);
@@ -34,8 +37,7 @@ export function AuthProvider({ children }) {
     refreshMe();
   }, [refreshMe]);
 
-  const login = async (email, password) => {
-    const { data } = await api.post("/auth/login", { email, password });
+  const establishSession = async (data) => {
     if (data?.token) setSessionAccessToken(data.token);
     const u = await refreshMe();
     if (!u) {
@@ -45,6 +47,16 @@ export function AuthProvider({ children }) {
       );
     }
     return u;
+  };
+
+  const login = async (email, password) => {
+    const { data } = await api.post("/auth/login", { email, password });
+    return establishSession(data);
+  };
+
+  const loginWithOtp = async (email, otp) => {
+    const { data } = await api.post("/auth/verify-otp", { email, otp });
+    return establishSession(data);
   };
 
   const signup = async (payload) => {
@@ -62,10 +74,11 @@ export function AuthProvider({ children }) {
     clearSessionAccessToken();
     setUser(false);
     setTeam(null);
+    setRoleInTeam(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, team, login, signup, logout, refreshMe, setUser }}>
+    <AuthContext.Provider value={{ user, team, roleInTeam, login, loginWithOtp, signup, logout, refreshMe, setUser }}>
       {children}
     </AuthContext.Provider>
   );

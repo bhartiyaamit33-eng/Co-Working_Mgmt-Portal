@@ -24,6 +24,7 @@ export default function AdminConfiguration() {
         working_hours_end: cfg.working_hours_end,
         daily_cap_hours: cfg.daily_cap_hours,
         weekly_cap_hours: cfg.weekly_cap_hours,
+        monthly_cap_hours: cfg.monthly_cap_hours,
         lead_time_hours: cfg.lead_time_hours,
         booking_window_days: cfg.booking_window_days,
         max_booking_hours: cfg.max_booking_hours,
@@ -53,6 +54,7 @@ export default function AdminConfiguration() {
         <Section title="Quotas (per team)">
           <Field label="Daily cap (hours)"><input type="number" min={1} className="input-field" value={cfg.daily_cap_hours} onChange={set("daily_cap_hours")} data-testid="cfg-daily" /></Field>
           <Field label="Weekly cap (hours)"><input type="number" min={1} className="input-field" value={cfg.weekly_cap_hours} onChange={set("weekly_cap_hours")} data-testid="cfg-weekly" /></Field>
+          <Field label="Monthly cap (hours)"><input type="number" min={1} className="input-field" value={cfg.monthly_cap_hours ?? 80} onChange={set("monthly_cap_hours")} data-testid="cfg-monthly" /></Field>
         </Section>
         <Section title="Per-booking limits">
           <Field label="Min booking (hours)"><input type="number" min={1} className="input-field" value={cfg.min_booking_hours} onChange={set("min_booking_hours")} data-testid="cfg-min" /></Field>

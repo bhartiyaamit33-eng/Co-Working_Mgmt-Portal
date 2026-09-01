@@ -76,6 +76,23 @@ def gen_reset_token() -> str:
     return secrets.token_urlsafe(32)
 
 
+def gen_otp(digits: int = 6) -> str:
+    n = 10 ** digits
+    return f"{secrets.randbelow(n):0{digits}d}"
+
+
+def hash_otp(otp: str) -> str:
+    import hashlib
+    return hashlib.sha256(f"{otp}:{get_jwt_secret()}".encode("utf-8")).hexdigest()
+
+
+def verify_otp(plain: str, hashed: str) -> bool:
+    if not plain or not hashed:
+        return False
+    expected = hash_otp(plain)
+    return secrets.compare_digest(expected, hashed)
+
+
 # --- Dependency for getting current user ---
 def make_get_current_user(db_getter):
     """Factory that returns a FastAPI dependency closing over the db reference."""
