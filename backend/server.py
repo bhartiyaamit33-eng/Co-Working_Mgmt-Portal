@@ -20,13 +20,21 @@ from pydantic import BaseModel, Field, EmailStr, ConfigDict, TypeAdapter, Valida
 from auth import (
     hash_password, verify_password, create_access_token, create_refresh_token,
     set_auth_cookies, clear_auth_cookies, decode_token, extract_token,
-    make_get_current_user, gen_reset_token,
+    make_get_current_user, gen_reset_token, gen_otp, hash_otp, verify_otp,
+)
+from mailer import send_email
+from policy import (
+    ADMIN_EMAIL, account_email_error, are_consecutive_in_cluster,
+    is_admin_email, login_email_error, normalize_email,
 )
 from seed import run_seed
 
 logging.basicConfig(level=logging.INFO)
 
-ALLOWED_BULK_USER_ROLES = frozenset({"member", "team_lead", "admin"})
+ALLOWED_BULK_USER_ROLES = frozenset({"member", "team_lead"})
+OTP_TTL_MIN = 10
+OTP_MAX_PER_WINDOW = 5
+OTP_WINDOW_MIN = 15
 _csv_email_adapter = TypeAdapter(EmailStr)
 logger = logging.getLogger("dsse")
 
@@ -86,6 +94,22 @@ class ForgotIn(BaseModel):
     email: EmailStr
 
 
+class RequestOtpIn(BaseModel):
+    email: EmailStr
+    purpose: Literal["login", "reset"] = "login"
+
+
+class VerifyOtpIn(BaseModel):
+    email: EmailStr
+    otp: str = Field(min_length=6, max_length=6)
+
+
+class ResetOtpIn(BaseModel):
+    email: EmailStr
+    otp: str = Field(min_length=6, max_length=6)
+    new_password: str = Field(min_length=6)
+
+
 class ResetIn(BaseModel):
     token: str
     new_password: str = Field(min_length=6)
@@ -115,7 +139,7 @@ class UserCreateAdmin(BaseModel):
     email: EmailStr
     first_name: str
     last_name: str
-    role: Literal["super_admin", "admin", "team_lead", "member"]
+    role: Literal["team_lead", "member"]
     initial_password: str = Field(min_length=6)
     roll_number: Optional[str] = ""
     phone: Optional[str] = ""
@@ -142,6 +166,14 @@ class BookingIn(BaseModel):
     team_id: Optional[str] = None  # if user belongs to multiple teams
 
 
+class TeamBookingIn(BaseModel):
+    seat_ids: List[int] = Field(min_length=2, max_length=6)
+    member_ids: List[str] = Field(min_length=2, max_length=6)
+    start_time: str
+    end_time: str
+    team_id: Optional[str] = None
+
+
 class BookingApprove(BaseModel):
     pass
 
@@ -160,6 +192,7 @@ class ConfigUpdate(BaseModel):
     working_hours_end: Optional[int] = None
     daily_cap_hours: Optional[int] = None
     weekly_cap_hours: Optional[int] = None
+    monthly_cap_hours: Optional[int] = None
     lead_time_hours: Optional[int] = None
     booking_window_days: Optional[int] = None
     max_booking_hours: Optional[int] = None
@@ -193,7 +226,26 @@ class NotificationCreate(BaseModel):
 # ---------- Helpers ----------
 async def get_config() -> dict:
     cfg = await db.configuration.find_one({"id": "default"}, {"_id": 0})
+    if not cfg:
+        return {}
+    cfg.setdefault("monthly_cap_hours", 80)
     return cfg
+
+
+def require_allowed_email(email: str, role: Optional[str] = None) -> str:
+    email = normalize_email(email)
+    err = account_email_error(email, role)
+    if err:
+        raise HTTPException(400, err)
+    return email
+
+
+def require_login_email(email: str) -> str:
+    email = normalize_email(email)
+    err = login_email_error(email)
+    if err:
+        raise HTTPException(400, err)
+    return email
 
 
 def parse_iso(s: str) -> datetime:
@@ -232,15 +284,13 @@ async def notify(user_id: str, title: str, body: str, ntype: str = "info"):
 
 
 # ---------- Booking rules ----------
-async def validate_booking(user: dict, payload: BookingIn) -> tuple[dict, dict]:
-    """Returns (config, team) on success, raises HTTPException otherwise."""
-    cfg = await get_config()
+IST = timezone(timedelta(hours=5, minutes=30))
 
+
+async def resolve_active_team(user: dict, team_id: Optional[str] = None) -> dict:
     if user.get("status") != "active":
         raise HTTPException(400, "Your account is not active.")
-
-    # Resolve team
-    membership = await user_team(user["id"], payload.team_id)
+    membership = await user_team(user["id"], team_id)
     if not membership or not membership["team"]:
         raise HTTPException(400, "You are not a member of any active team. Contact admin.")
     team = membership["team"]
@@ -249,11 +299,12 @@ async def validate_booking(user: dict, payload: BookingIn) -> tuple[dict, dict]:
     au = date.fromisoformat(team["active_until"])
     if not (af <= today <= au):
         raise HTTPException(400, "Your team is not active for the current period.")
+    return {"membership": membership["membership"], "team": team}
 
-    # Times — convert to IST for human-friendly working hours / day comparisons
-    IST = timezone(timedelta(hours=5, minutes=30))
-    start = parse_iso(payload.start_time)
-    end = parse_iso(payload.end_time)
+
+def parse_booking_window(start_time: str, end_time: str, cfg: dict) -> tuple[datetime, datetime, float]:
+    start = parse_iso(start_time)
+    end = parse_iso(end_time)
     if end <= start:
         raise HTTPException(400, "End time must be after start time.")
 
@@ -265,74 +316,159 @@ async def validate_booking(user: dict, payload: BookingIn) -> tuple[dict, dict]:
     if duration_h > cfg["max_booking_hours"]:
         raise HTTPException(400, f"Maximum booking is {cfg['max_booking_hours']} hours per slot.")
 
-    # Working hours (IST)
     if start_ist.hour < cfg["working_hours_start"] or end_ist.hour > cfg["working_hours_end"] or (end_ist.hour == cfg["working_hours_end"] and end_ist.minute > 0):
         raise HTTPException(400, f"Bookings allowed only between {cfg['working_hours_start']}:00 and {cfg['working_hours_end']}:00 IST.")
 
-    # Booking window (IST date)
     today_ist = datetime.now(IST).date()
     if start_ist.date() > today_ist + timedelta(days=cfg["booking_window_days"]):
         raise HTTPException(400, f"Cannot book more than {cfg['booking_window_days']} days ahead.")
+    return start, end, duration_h
 
-    # Seat existence + availability
-    seat = await db.seats.find_one({"id": payload.seat_id}, {"_id": 0})
+
+def _ist_day_bounds(d: date) -> tuple[datetime, datetime]:
+    start = datetime.combine(d, datetime.min.time(), tzinfo=IST).astimezone(timezone.utc)
+    return start, start + timedelta(days=1)
+
+
+def _ist_week_bounds(d: date) -> tuple[datetime, datetime]:
+    week_start = d - timedelta(days=d.weekday())
+    start = datetime.combine(week_start, datetime.min.time(), tzinfo=IST).astimezone(timezone.utc)
+    return start, start + timedelta(days=7)
+
+
+def _ist_month_bounds(d: date) -> tuple[datetime, datetime]:
+    month_start = d.replace(day=1)
+    if month_start.month == 12:
+        next_month = month_start.replace(year=month_start.year + 1, month=1)
+    else:
+        next_month = month_start.replace(month=month_start.month + 1)
+    start = datetime.combine(month_start, datetime.min.time(), tzinfo=IST).astimezone(timezone.utc)
+    end = datetime.combine(next_month, datetime.min.time(), tzinfo=IST).astimezone(timezone.utc)
+    return start, end
+
+
+async def team_hours_in_range(team_id: str, range_start: datetime, range_end: datetime) -> float:
+    """Session hours: a group booking (shared group_id) counts once, not per seat."""
+    seen_groups = set()
+    total = 0.0
+    cur = db.bookings.find({
+        "team_id": team_id,
+        "status": {"$in": ["pending", "approved"]},
+        "start_time": {"$gte": range_start.isoformat(), "$lt": range_end.isoformat()},
+    }, {"_id": 0, "start_time": 1, "end_time": 1, "group_id": 1})
+    async for b in cur:
+        gid = b.get("group_id")
+        if gid:
+            if gid in seen_groups:
+                continue
+            seen_groups.add(gid)
+        total += (parse_iso(b["end_time"]) - parse_iso(b["start_time"])).total_seconds() / 3600
+    return total
+
+
+async def assert_team_quota(team_id: str, start: datetime, duration_h: float, cfg: dict):
+    start_ist = start.astimezone(IST)
+    day_start, day_end = _ist_day_bounds(start_ist.date())
+    daily_total = await team_hours_in_range(team_id, day_start, day_end)
+    if daily_total + duration_h > cfg["daily_cap_hours"]:
+        remaining = max(0, cfg["daily_cap_hours"] - daily_total)
+        raise HTTPException(400, f"Daily cap reached. Your team has used {daily_total:g} of {cfg['daily_cap_hours']} hours today. You can book at most {remaining:g} more.")
+
+    week_start, week_end = _ist_week_bounds(start_ist.date())
+    weekly_total = await team_hours_in_range(team_id, week_start, week_end)
+    if weekly_total + duration_h > cfg["weekly_cap_hours"]:
+        remaining = max(0, cfg["weekly_cap_hours"] - weekly_total)
+        raise HTTPException(400, f"Weekly cap reached. Your team has used {weekly_total:g} of {cfg['weekly_cap_hours']} hours this week. You can book at most {remaining:g} more.")
+
+    month_start, month_end = _ist_month_bounds(start_ist.date())
+    monthly_total = await team_hours_in_range(team_id, month_start, month_end)
+    monthly_cap = cfg.get("monthly_cap_hours") or 80
+    if monthly_total + duration_h > monthly_cap:
+        remaining = max(0, monthly_cap - monthly_total)
+        raise HTTPException(400, f"Monthly cap reached. Your team has used {monthly_total:g} of {monthly_cap} hours this month. You can book at most {remaining:g} more.")
+
+
+async def assert_seat_bookable(seat_id: int, start: datetime, end: datetime):
+    seat = await db.seats.find_one({"id": seat_id}, {"_id": 0})
     if not seat:
         raise HTTPException(404, "Seat not found.")
     if seat["status"] == "maintenance":
-        raise HTTPException(400, "Seat is under maintenance.")
+        raise HTTPException(400, f"Seat #{seat_id} is under maintenance.")
     if seat["status"] == "blocked":
-        raise HTTPException(400, "This seat is not available for booking.")
-
-    # Overlap on same seat (pending/approved)
+        raise HTTPException(400, f"Seat #{seat_id} is not available for booking.")
     overlap = await db.bookings.find_one({
-        "seat_id": payload.seat_id,
+        "seat_id": seat_id,
         "status": {"$in": ["pending", "approved"]},
         "start_time": {"$lt": end.isoformat()},
         "end_time": {"$gt": start.isoformat()},
     })
     if overlap:
-        raise HTTPException(409, "This seat is already booked for the selected time.")
+        raise HTTPException(409, f"Seat #{seat_id} is already booked for the selected time.")
+    return seat
 
-    # Daily cap (team) — use IST day boundaries
-    day_ist_start = datetime.combine(start_ist.date(), datetime.min.time(), tzinfo=IST)
-    day_start = day_ist_start.astimezone(timezone.utc)
-    day_end = day_start + timedelta(days=1)
-    daily_total = 0.0
-    cur = db.bookings.find({
-        "team_id": team["id"],
-        "status": {"$in": ["pending", "approved"]},
-        "start_time": {"$gte": day_start.isoformat(), "$lt": day_end.isoformat()},
-    }, {"_id": 0, "start_time": 1, "end_time": 1})
-    async for b in cur:
-        daily_total += (parse_iso(b["end_time"]) - parse_iso(b["start_time"])).total_seconds() / 3600
-    if daily_total + duration_h > cfg["daily_cap_hours"]:
-        remaining = max(0, cfg["daily_cap_hours"] - daily_total)
-        raise HTTPException(400, f"Daily cap reached. Your team has used {daily_total:g} of {cfg['daily_cap_hours']} hours today. You can book at most {remaining:g} more.")
 
-    # Weekly cap (team) — ISO week starting Monday IST
-    week_start_date = start_ist.date() - timedelta(days=start_ist.weekday())
-    week_end_date = week_start_date + timedelta(days=7)
-    week_start_dt = datetime.combine(week_start_date, datetime.min.time(), tzinfo=IST).astimezone(timezone.utc)
-    week_end_dt = datetime.combine(week_end_date, datetime.min.time(), tzinfo=IST).astimezone(timezone.utc)
-    weekly_total = 0.0
-    cur = db.bookings.find({
-        "team_id": team["id"],
-        "status": {"$in": ["pending", "approved"]},
-        "start_time": {"$gte": week_start_dt.isoformat(), "$lt": week_end_dt.isoformat()},
-    }, {"_id": 0, "start_time": 1, "end_time": 1})
-    async for b in cur:
-        weekly_total += (parse_iso(b["end_time"]) - parse_iso(b["start_time"])).total_seconds() / 3600
-    if weekly_total + duration_h > cfg["weekly_cap_hours"]:
-        remaining = max(0, cfg["weekly_cap_hours"] - weekly_total)
-        raise HTTPException(400, f"Weekly cap reached. Your team has used {weekly_total:g} of {cfg['weekly_cap_hours']} hours this week. You can book at most {remaining:g} more.")
-
+async def validate_booking(user: dict, payload: BookingIn) -> tuple[dict, dict]:
+    """Returns (config, team) on success, raises HTTPException otherwise."""
+    cfg = await get_config()
+    resolved = await resolve_active_team(user, payload.team_id)
+    team = resolved["team"]
+    start, end, duration_h = parse_booking_window(payload.start_time, payload.end_time, cfg)
+    await assert_seat_bookable(payload.seat_id, start, end)
+    await assert_team_quota(team["id"], start, duration_h, cfg)
     return cfg, team
+
+
+def is_team_lead_for(user: dict, membership: dict) -> bool:
+    return user.get("role") == "team_lead" or membership.get("role_in_team") == "team_lead"
+
+
+# ===================== AUTH =====================
+def _issue_session(response: Response, user: dict) -> dict:
+    access = create_access_token(user["id"], user["email"], user["role"])
+    refresh = create_refresh_token(user["id"])
+    set_auth_cookies(response, access, refresh)
+    safe = {k: v for k, v in user.items() if k not in ("password_hash", "_id")}
+    return {"user": safe, "token": access}
+
+
+async def _create_otp(email: str, purpose: str) -> str:
+    since = (datetime.now(timezone.utc) - timedelta(minutes=OTP_WINDOW_MIN)).isoformat()
+    recent = await db.otp_tokens.count_documents({"email": email, "created_at": {"$gte": since}})
+    if recent >= OTP_MAX_PER_WINDOW:
+        raise HTTPException(429, "Too many codes requested. Try again in a few minutes.")
+    await db.otp_tokens.update_many({"email": email, "purpose": purpose, "used": False}, {"$set": {"used": True}})
+    code = gen_otp()
+    await db.otp_tokens.insert_one({
+        "id": str(uuid.uuid4()),
+        "email": email,
+        "purpose": purpose,
+        "otp_hash": hash_otp(code),
+        "expires_at": (datetime.now(timezone.utc) + timedelta(minutes=OTP_TTL_MIN)).isoformat(),
+        "used": False,
+        "created_at": utcnow_iso(),
+    })
+    return code
+
+
+async def _consume_otp(email: str, otp: str, purpose: str) -> None:
+    recs = await db.otp_tokens.find(
+        {"email": email, "purpose": purpose, "used": False},
+        {"_id": 0},
+    ).sort("created_at", -1).to_list(1)
+    rec = recs[0] if recs else None
+    if not rec or not verify_otp(otp, rec.get("otp_hash", "")):
+        raise HTTPException(400, "Invalid or expired code.")
+    if parse_iso(rec["expires_at"]) < datetime.now(timezone.utc):
+        raise HTTPException(400, "Code expired. Request a new one.")
+    await db.otp_tokens.update_one({"id": rec["id"]}, {"$set": {"used": True}})
 
 
 # ===================== AUTH =====================
 @api.post("/auth/register")
 async def register(payload: RegisterIn, response: Response):
-    email = payload.email.lower()
+    email = require_allowed_email(payload.email)
+    if is_admin_email(email):
+        raise HTTPException(400, f"{ADMIN_EMAIL} is reserved for admin access.")
     if await db.users.find_one({"email": email}):
         raise HTTPException(400, "Email is already registered.")
     user_id = str(uuid.uuid4())
@@ -360,18 +496,36 @@ async def register(payload: RegisterIn, response: Response):
 
 @api.post("/auth/login")
 async def login(payload: LoginIn, response: Response):
-    email = payload.email.lower()
+    email = require_login_email(payload.email)
     user = await db.users.find_one({"email": email})
-    if not user or not verify_password(payload.password, user["password_hash"]):
+    if not user or not verify_password(payload.password, user.get("password_hash") or ""):
         raise HTTPException(401, "Invalid email or password.")
     if user.get("status") == "suspended":
         raise HTTPException(403, "Your account has been suspended.")
-    access = create_access_token(user["id"], user["email"], user["role"])
-    refresh = create_refresh_token(user["id"])
-    set_auth_cookies(response, access, refresh)
-    user.pop("_id", None)
-    user.pop("password_hash", None)
-    return {"user": user, "token": access}
+    if user.get("role") in ALL_ADMIN_ROLES and not is_admin_email(email):
+        raise HTTPException(403, f"Admin access is limited to {ADMIN_EMAIL}.")
+    return _issue_session(response, user)
+
+
+@api.post("/auth/request-otp")
+async def request_otp(payload: RequestOtpIn):
+    email = require_login_email(payload.email)
+    user = await db.users.find_one({"email": email}, {"_id": 0})
+    # Don't leak whether the account exists
+    if user and user.get("status") != "suspended":
+        code = await _create_otp(email, payload.purpose)
+        subject = "Your DSSE booking login code" if payload.purpose == "login" else "Your DSSE password reset code"
+        delivered = send_email(
+            email,
+            subject,
+            f"Your one-time code is {code}. It expires in {OTP_TTL_MIN} minutes.\n\nIf you did not request this, ignore this email.",
+        )
+        out = {"ok": True, "delivered": delivered}
+        if not delivered:
+            out["otp"] = code
+            logger.info("[OTP] %s (%s): %s", email, payload.purpose, code)
+        return out
+    return {"ok": True, "delivered": False}
 
 
 @api.post("/auth/logout")
@@ -384,7 +538,11 @@ async def logout(response: Response, user: dict = Depends(get_current_user)):
 async def me(user: dict = Depends(get_current_user)):
     # Attach team info if any
     team_info = await user_team(user["id"])
-    return {"user": user, "team": team_info["team"] if team_info else None}
+    return {
+        "user": user,
+        "team": team_info["team"] if team_info else None,
+        "role_in_team": team_info["membership"].get("role_in_team") if team_info else None,
+    }
 
 
 @api.post("/auth/refresh")
@@ -406,9 +564,37 @@ async def refresh_token(request: Request, response: Response):
     return {"ok": True}
 
 
+@api.post("/auth/verify-otp")
+async def verify_otp_login(payload: VerifyOtpIn, response: Response):
+    email = require_login_email(payload.email)
+    await _consume_otp(email, payload.otp.strip(), "login")
+    user = await db.users.find_one({"email": email})
+    if not user:
+        raise HTTPException(400, "Invalid or expired code.")
+    if user.get("status") == "suspended":
+        raise HTTPException(403, "Your account has been suspended.")
+    if user.get("role") in ALL_ADMIN_ROLES and not is_admin_email(email):
+        raise HTTPException(403, f"Admin access is limited to {ADMIN_EMAIL}.")
+    return _issue_session(response, user)
+
+
+@api.post("/auth/reset-password-otp")
+async def reset_password_otp(payload: ResetOtpIn):
+    email = require_login_email(payload.email)
+    await _consume_otp(email, payload.otp.strip(), "reset")
+    user = await db.users.find_one({"email": email})
+    if not user:
+        raise HTTPException(400, "Invalid or expired code.")
+    await db.users.update_one(
+        {"id": user["id"]},
+        {"$set": {"password_hash": hash_password(payload.new_password), "updated_at": utcnow_iso()}},
+    )
+    return {"ok": True}
+
+
 @api.post("/auth/forgot-password")
 async def forgot_password(payload: ForgotIn):
-    email = payload.email.lower()
+    email = require_login_email(payload.email)
     user = await db.users.find_one({"email": email}, {"_id": 0})
     # Don't leak whether email exists
     if user:
@@ -493,7 +679,9 @@ async def list_users(role: Optional[str] = None, status: Optional[str] = None, _
 
 @api.post("/admin/users")
 async def admin_create_user(payload: UserCreateAdmin, _: dict = Depends(require_admin)):
-    email = payload.email.lower()
+    email = require_allowed_email(payload.email, payload.role)
+    if payload.role in ALL_ADMIN_ROLES and not is_admin_email(email):
+        raise HTTPException(400, f"Admin access is limited to {ADMIN_EMAIL}.")
     if await db.users.find_one({"email": email}):
         raise HTTPException(400, "Email already registered")
     uid = str(uuid.uuid4())
@@ -566,7 +754,7 @@ async def admin_import_users_csv(file: UploadFile = File(...), _: dict = Depends
     skipped: List[str] = []
 
     for line_no, row in enumerate(reader, start=2):
-        email = pick(row, "email").lower()
+        email = normalize_email(pick(row, "email"))
         first_name = pick(row, "first_name")
         last_name = pick(row, "last_name")
         initial_password = pick(row, "initial_password", "password")
@@ -582,6 +770,10 @@ async def admin_import_users_csv(file: UploadFile = File(...), _: dict = Depends
             _csv_email_adapter.validate_python(email)
         except ValidationError:
             errors.append(f"Row {line_no}: invalid email {email!r}")
+            continue
+        policy_err = account_email_error(email, role)
+        if policy_err:
+            errors.append(f"Row {line_no}: {policy_err}")
             continue
         if not first_name or not last_name:
             errors.append(f"Row {line_no}: missing first_name or last_name")
@@ -709,14 +901,21 @@ async def team_detail(team_id: str, user: dict = Depends(get_current_user)):
     upcoming = []
     async for b in db.bookings.find({"team_id": team_id, "status": {"$in": ["pending", "approved"]}, "start_time": {"$gte": utcnow_iso()}}, {"_id": 0}).sort("start_time", 1).limit(20):
         upcoming.append(b)
-    # Weekly usage
-    today = date.today()
-    week_start = today - timedelta(days=today.weekday())
-    week_start_dt = datetime.combine(week_start, datetime.min.time(), tzinfo=timezone.utc)
-    weekly_hours = 0
-    async for b in db.bookings.find({"team_id": team_id, "status": {"$in": ["pending", "approved"]}, "start_time": {"$gte": week_start_dt.isoformat()}}, {"_id": 0}):
-        weekly_hours += int((parse_iso(b["end_time"]) - parse_iso(b["start_time"])).total_seconds() // 3600)
-    return {"team": team, "members": members, "upcoming": upcoming, "weekly_hours": weekly_hours}
+    today_ist = datetime.now(IST).date()
+    day_s, day_e = _ist_day_bounds(today_ist)
+    week_s, week_e = _ist_week_bounds(today_ist)
+    month_s, month_e = _ist_month_bounds(today_ist)
+    daily_hours = await team_hours_in_range(team_id, day_s, day_e)
+    weekly_hours = await team_hours_in_range(team_id, week_s, week_e)
+    monthly_hours = await team_hours_in_range(team_id, month_s, month_e)
+    return {
+        "team": team,
+        "members": members,
+        "upcoming": upcoming,
+        "daily_hours": daily_hours,
+        "weekly_hours": weekly_hours,
+        "monthly_hours": monthly_hours,
+    }
 
 
 @api.post("/admin/teams/import")
@@ -862,10 +1061,96 @@ async def create_booking(payload: BookingIn, user: dict = Depends(require_active
     return doc
 
 
+@api.post("/bookings/team")
+async def create_team_booking(payload: TeamBookingIn, user: dict = Depends(require_active)):
+    """Team lead books consecutive seats in one cluster for several members. Quotas count session hours once."""
+    if len(payload.seat_ids) != len(payload.member_ids):
+        raise HTTPException(400, "Select one seat per team member.")
+    if len(set(payload.seat_ids)) != len(payload.seat_ids):
+        raise HTTPException(400, "Seats must be unique.")
+    if len(set(payload.member_ids)) != len(payload.member_ids):
+        raise HTTPException(400, "Members must be unique.")
+    if not are_consecutive_in_cluster(payload.seat_ids):
+        raise HTTPException(400, "Team seats must be consecutive numbers in the same cluster so the group can sit together.")
+
+    cfg = await get_config()
+    resolved = await resolve_active_team(user, payload.team_id)
+    team = resolved["team"]
+    if not is_team_lead_for(user, resolved["membership"]):
+        raise HTTPException(403, "Only the team lead can book for the whole team.")
+
+    start, end, duration_h = parse_booking_window(payload.start_time, payload.end_time, cfg)
+
+    members = []
+    for mid in payload.member_ids:
+        u = await db.users.find_one({"id": mid}, {"_id": 0, "password_hash": 0})
+        if not u or u.get("status") != "active":
+            raise HTTPException(400, "Every selected teammate must have an active account.")
+        mem = await db.team_memberships.find_one({"user_id": mid, "team_id": team["id"], "left_at": None})
+        if not mem:
+            raise HTTPException(400, f"{u['first_name']} {u['last_name']} is not on this team.")
+        members.append(u)
+
+    seat_ids = sorted(payload.seat_ids)
+    for sid in seat_ids:
+        await assert_seat_bookable(sid, start, end)
+    await assert_team_quota(team["id"], start, duration_h, cfg)
+
+    auto_approve = team["program"] in (cfg.get("auto_approve_programs") or [])
+    status = "approved" if auto_approve else "pending"
+    group_id = str(uuid.uuid4())
+    created = []
+    for sid, member in zip(seat_ids, members):
+        doc = {
+            "id": str(uuid.uuid4()),
+            "group_id": group_id,
+            "team_id": team["id"],
+            "team_name": team["name"],
+            "user_id": member["id"],
+            "user_name": f"{member['first_name']} {member['last_name']}",
+            "booked_by": user["id"],
+            "booked_by_name": f"{user['first_name']} {user['last_name']}",
+            "seat_id": sid,
+            "start_time": start.isoformat(),
+            "end_time": end.isoformat(),
+            "status": status,
+            "rejection_reason": None,
+            "approved_by": None,
+            "approved_at": None,
+            "created_at": utcnow_iso(),
+            "updated_at": utcnow_iso(),
+        }
+        await db.bookings.insert_one(doc)
+        doc.pop("_id", None)
+        created.append(doc)
+        if member["id"] != user["id"]:
+            await notify(
+                member["id"],
+                "Team seat reserved" if auto_approve else "Team booking submitted",
+                f"Seat #{sid} was booked for you by {user['first_name']}.",
+                "success" if auto_approve else "info",
+            )
+
+    seat_label = ", ".join(f"#{s}" for s in seat_ids)
+    await notify(
+        user["id"],
+        "Team booking approved" if auto_approve else "Team booking submitted",
+        f"Seats {seat_label} for {len(created)} members.",
+        "success" if auto_approve else "info",
+    )
+    if not auto_approve:
+        async for adm in db.users.find({"role": {"$in": list(ALL_ADMIN_ROLES)}, "status": "active"}, {"_id": 0, "id": 1}):
+            await notify(adm["id"], "Team booking awaiting approval", f"{user['first_name']} requested seats {seat_label}.", "approval")
+    return {"group_id": group_id, "status": status, "bookings": created}
+
+
 @api.get("/bookings/mine")
 async def my_bookings(user: dict = Depends(get_current_user)):
     out = []
-    async for b in db.bookings.find({"user_id": user["id"]}, {"_id": 0}).sort("start_time", -1):
+    async for b in db.bookings.find(
+        {"$or": [{"user_id": user["id"]}, {"booked_by": user["id"]}]},
+        {"_id": 0},
+    ).sort("start_time", -1):
         out.append(b)
     return out
 
@@ -875,7 +1160,12 @@ async def cancel_booking(booking_id: str, user: dict = Depends(get_current_user)
     b = await db.bookings.find_one({"id": booking_id})
     if not b:
         raise HTTPException(404, "Not found")
-    if b["user_id"] != user["id"] and user["role"] not in ALL_ADMIN_ROLES:
+    allowed = b["user_id"] == user["id"] or user["role"] in ALL_ADMIN_ROLES or b.get("booked_by") == user["id"]
+    if not allowed:
+        info = await user_team(user["id"])
+        if info and info["team"]["id"] == b.get("team_id") and is_team_lead_for(user, info["membership"]):
+            allowed = True
+    if not allowed:
         raise HTTPException(403, "Not allowed")
     if b["status"] not in ("pending", "approved"):
         raise HTTPException(400, "Cannot cancel this booking")
@@ -1156,6 +1446,9 @@ async def on_startup():
     await db.bookings.create_index("status")
     await db.team_memberships.create_index([("user_id", 1), ("team_id", 1)])
     await db.password_reset_tokens.create_index("expires_at")
+    await db.otp_tokens.create_index("email")
+    await db.otp_tokens.create_index("expires_at")
+    await db.bookings.create_index("group_id")
     await db.notifications.create_index("user_id")
     # Seed
     await run_seed(db, hash_password)

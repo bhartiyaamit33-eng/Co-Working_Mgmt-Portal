@@ -27,7 +27,8 @@ export default function MyTeam() {
     </Layout>
   );
 
-  const usagePct = data ? Math.min(100, (data.weekly_hours / 20) * 100) : 0;
+  const weeklyCap = 20;
+  const usagePct = data ? Math.min(100, ((data.weekly_hours || 0) / weeklyCap) * 100) : 0;
 
   return (
     <Layout title={team.name} subtitle={team.program?.replace("_", " ").toUpperCase()}>
@@ -36,7 +37,10 @@ export default function MyTeam() {
           <span className="label-eyebrow">Weekly usage</span>
           <div className="flex items-baseline gap-2 mt-2">
             <span className="font-serif text-4xl text-navy">{data?.weekly_hours || 0}</span>
-            <span className="text-slate-400">/ 20h this week</span>
+            <span className="text-slate-400">/ {weeklyCap}h this week</span>
+          </div>
+          <div className="text-xs text-slate-500 mt-2">
+            Today {data?.daily_hours || 0}h · This month {data?.monthly_hours || 0}h
           </div>
           <div className="mt-4 h-2 bg-navy/5 rounded-full overflow-hidden">
             <div className="h-full bg-amber rounded-full" style={{ width: `${usagePct}%` }} />

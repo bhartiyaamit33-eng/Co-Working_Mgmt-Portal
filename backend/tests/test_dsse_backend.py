@@ -41,8 +41,20 @@ class TestAuth:
         r = requests.post(f"{API}/auth/login", json={"email": SUPER_ADMIN_EMAIL, "password": "wrong"})
         assert r.status_code == 401
 
+    def test_register_rejects_non_iitb(self):
+        r = requests.post(f"{API}/auth/register", json={
+            "email": f"outsider_{datetime.utcnow().timestamp()}@gmail.com",
+            "password": "Test@123",
+            "first_name": "Out", "last_name": "Sider",
+        })
+        assert r.status_code == 400
+
+    def test_login_rejects_non_iitb(self):
+        r = requests.post(f"{API}/auth/login", json={"email": "random.person@gmail.com", "password": "whatever"})
+        assert r.status_code == 400
+
     def test_register_applicant(self):
-        email = f"test_applicant_{datetime.utcnow().timestamp()}@test.com"
+        email = f"test_applicant_{datetime.utcnow().timestamp()}@iitb.ac.in"
         r = requests.post(f"{API}/auth/register", json={
             "email": email, "password": "Test@123",
             "first_name": "Test", "last_name": "Applicant",
@@ -107,6 +119,7 @@ class TestSeatsConfig:
         assert cfg["working_hours_end"] == 18
         assert cfg["daily_cap_hours"] == 4
         assert cfg["weekly_cap_hours"] == 20
+        assert cfg.get("monthly_cap_hours", 80) == 80
         assert cfg["lead_time_hours"] == 0
         assert cfg["booking_window_days"] == 7
 
@@ -174,7 +187,7 @@ class TestRBAC:
 # ---------------- USER MANAGEMENT ----------------
 class TestUserManagement:
     def test_create_member(self, admin_session):
-        email = f"test_member_{int(datetime.utcnow().timestamp())}@test.com"
+        email = f"test_member_{int(datetime.utcnow().timestamp())}@iitb.ac.in"
         r = admin_session.post(f"{API}/admin/users", json={
             "email": email, "first_name": "Test", "last_name": "Member",
             "role": "member", "initial_password": "Member@123",
@@ -200,7 +213,7 @@ class TestUserManagement:
 
     def test_approve_applicant(self, admin_session):
         # Create fresh applicant
-        email = f"test_app2_{int(datetime.utcnow().timestamp())}@test.com"
+        email = f"test_app2_{int(datetime.utcnow().timestamp())}@iitb.ac.in"
         rr = requests.post(f"{API}/auth/register", json={
             "email": email, "password": "Test@123",
             "first_name": "Pend", "last_name": "User",
@@ -392,7 +405,7 @@ class TestViolations:
 
     def test_log_tier3_suspends(self, admin_session):
         # Create another member so we can suspend them
-        email = f"test_suspend_{int(datetime.utcnow().timestamp())}@test.com"
+        email = f"test_suspend_{int(datetime.utcnow().timestamp())}@iitb.ac.in"
         r = admin_session.post(f"{API}/admin/users", json={
             "email": email, "first_name": "Susp", "last_name": "End",
             "role": "member", "initial_password": "Pass@123",
@@ -435,3 +448,131 @@ class TestGuidelines:
             "guidelines_id": STATE["guidelines_id"]
         }, headers=h)
         assert r.status_code == 200
+
+
+# ---------------- OTP ----------------
+class TestOtp:
+    def test_member_otp_login(self):
+        r = requests.post(f"{API}/auth/request-otp", json={"email": STATE["member_email"], "purpose": "login"})
+        assert r.status_code == 200
+        otp = r.json().get("otp")
+        assert otp and len(otp) == 6
+        r2 = requests.post(f"{API}/auth/verify-otp", json={"email": STATE["member_email"], "otp": otp})
+        assert r2.status_code == 200
+        assert r2.json()["user"]["email"] == STATE["member_email"]
+        assert r2.json()["token"]
+
+    def test_otp_rejects_gmail(self):
+        r = requests.post(f"{API}/auth/request-otp", json={"email": "someone@gmail.com", "purpose": "login"})
+        assert r.status_code == 400
+
+    def test_admin_otp_allowed(self):
+        r = requests.post(f"{API}/auth/request-otp", json={"email": SUPER_ADMIN_EMAIL, "purpose": "login"})
+        assert r.status_code == 200
+        otp = r.json().get("otp")
+        assert otp
+        r2 = requests.post(f"{API}/auth/verify-otp", json={"email": SUPER_ADMIN_EMAIL, "otp": otp})
+        assert r2.status_code == 200
+        assert r2.json()["user"]["role"] == "super_admin"
+
+
+# ---------------- TEAM BOOKING ----------------
+class TestTeamBooking:
+    def test_setup_team_of_four(self, admin_session):
+        stamp = int(datetime.utcnow().timestamp())
+        team = admin_session.post(f"{API}/admin/teams", json={
+            "name": f"TEST_Together_{stamp}", "program": "ideas_l1", "priority_tier": 3,
+            "active_from": "2026-01-01", "active_until": "2026-12-31",
+        })
+        assert team.status_code == 200
+        team_id = team.json()["id"]
+        ids = []
+        emails = []
+        for i, role in enumerate(("team_lead", "member", "member", "member")):
+            email = f"together_{stamp}_{i}@iitb.ac.in"
+            r = admin_session.post(f"{API}/admin/users", json={
+                "email": email, "first_name": f"P{i}", "last_name": "Sit",
+                "role": role, "initial_password": "Member@123", "team_id": team_id,
+            })
+            assert r.status_code == 200, r.text
+            ids.append(r.json()["id"])
+            emails.append(email)
+        STATE["together_team_id"] = team_id
+        STATE["together_member_ids"] = ids
+        STATE["together_lead_email"] = emails[0]
+        login = requests.post(f"{API}/auth/login", json={"email": emails[0], "password": "Member@123"})
+        assert login.status_code == 200
+        STATE["together_lead_token"] = login.json()["token"]
+
+    def test_admin_cannot_create_gmail_member(self, admin_session):
+        r = admin_session.post(f"{API}/admin/users", json={
+            "email": "someone.else@gmail.com", "first_name": "No", "last_name": "Gmail",
+            "role": "member", "initial_password": "Member@123",
+        })
+        assert r.status_code == 400
+
+    def test_member_cannot_team_book(self):
+        member_email = STATE["together_lead_email"].replace("_0@", "_1@")
+        login = requests.post(f"{API}/auth/login", json={"email": member_email, "password": "Member@123"})
+        assert login.status_code == 200
+        h = {"Authorization": f"Bearer {login.json()['token']}"}
+        start = _next_weekday_at_hour(10, 6)
+        end = start + timedelta(hours=1)
+        r = requests.post(f"{API}/bookings/team", json={
+            "seat_ids": [1, 2, 3, 4],
+            "member_ids": STATE["together_member_ids"],
+            "start_time": start.isoformat(),
+            "end_time": end.isoformat(),
+        }, headers=h)
+        assert r.status_code == 403
+
+    def test_non_consecutive_rejected(self):
+        h = {"Authorization": f"Bearer {STATE['together_lead_token']}"}
+        start = _next_weekday_at_hour(10, 6)
+        end = start + timedelta(hours=1)
+        r = requests.post(f"{API}/bookings/team", json={
+            "seat_ids": [1, 2, 3, 7],
+            "member_ids": STATE["together_member_ids"],
+            "start_time": start.isoformat(),
+            "end_time": end.isoformat(),
+        }, headers=h)
+        assert r.status_code == 400
+
+    def test_team_book_four_consecutive(self):
+        h = {"Authorization": f"Bearer {STATE['together_lead_token']}"}
+        blocks = [
+            [1, 2, 3, 4], [7, 8, 9, 10], [13, 14, 15, 16],
+            [19, 20, 21, 22], [24, 25, 26, 27], [30, 31, 32, 33],
+            [36, 37, 38, 39], [41, 42, 43, 44], [46, 47, 48, 49], [51, 52, 53, 54],
+        ]
+        created = None
+        for seats in blocks:
+            for day_off in range(2, 7):
+                for hr in range(9, 12):
+                    start = _next_weekday_at_hour(hr, day_off)
+                    end = start + timedelta(hours=1)
+                    r = requests.post(f"{API}/bookings/team", json={
+                        "seat_ids": seats,
+                        "member_ids": STATE["together_member_ids"],
+                        "start_time": start.isoformat(),
+                        "end_time": end.isoformat(),
+                    }, headers=h)
+                    if r.status_code == 200:
+                        created = (r.json(), start, seats)
+                        break
+                if created:
+                    break
+            if created:
+                break
+        assert created, "Could not create a 4-seat team booking"
+        data, start, seats = created
+        assert len(data["bookings"]) == 4
+        assert data["group_id"]
+        assert sorted(b["seat_id"] for b in data["bookings"]) == seats
+        STATE["together_booking"] = data
+        STATE["together_start"] = start
+
+    def test_team_booking_shares_group(self):
+        data = STATE["together_booking"]
+        assert {b["group_id"] for b in data["bookings"]} == {data["group_id"]}
+        assert {b["booked_by"] for b in data["bookings"]} == {data["bookings"][0]["booked_by"]}

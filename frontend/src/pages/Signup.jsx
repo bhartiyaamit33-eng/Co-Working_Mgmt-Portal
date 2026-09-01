@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth, formatRequestError } from "@/lib/auth";
+import { loginEmailError } from "@/lib/email";
 import { AuthShell } from "./Login";
 import { toast } from "sonner";
 
@@ -16,6 +17,8 @@ export default function Signup() {
 
   const onSubmit = async (e) => {
     e.preventDefault();
+    const domainErr = loginEmailError(form.email);
+    if (domainErr) { setErr(domainErr); return; }
     setBusy(true); setErr("");
     try {
       await signup(form);
@@ -58,6 +61,7 @@ export default function Signup() {
         <div>
           <label className="label-eyebrow">IIT Bombay email</label>
           <input type="email" required value={form.email} onChange={update("email")} className="input-field mt-1" placeholder="you@iitb.ac.in" data-testid="signup-email-input" />
+          <p className="text-[11px] text-slate-500 mt-1">Must be an @iitb.ac.in address. Gmail is not accepted for team accounts.</p>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>

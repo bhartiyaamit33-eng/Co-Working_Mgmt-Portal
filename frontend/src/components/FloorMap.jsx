@@ -48,6 +48,7 @@ export default function FloorMap({
   bookings = [],
   workingHours = [9, 18],
   selectedSeatId,
+  selectedSeatIds = [],
   onSeatClick,
   /** When true (admin seats UI), maintenance/blocked seats remain clickable so status can be toggled. */
   allowLockedSeatSelection = false,
@@ -72,7 +73,7 @@ export default function FloorMap({
   }, [seats, bookings]);
 
   const colorFor = (seat) => {
-    if (selectedSeatId === seat.id) return { fill: "#E8A33D", stroke: "#1B2A4E", text: "#1B2A4E" };
+    if (selectedSeatId === seat.id || selectedSeatIds.includes(seat.id)) return { fill: "#E8A33D", stroke: "#1B2A4E", text: "#1B2A4E" };
     const st = seatStatus[seat.id];
     if (!st) return { fill: "#fff", stroke: "#1B2A4E33", text: "#1B2A4E" };
     if (st.unavailable) return { fill: "#E5E7EB", stroke: "#94A3B8", text: "#64748B" };
@@ -205,7 +206,7 @@ export default function FloorMap({
 
           {seats.map((seat) => {
             const c = colorFor(seat);
-            const isSelected = selectedSeatId === seat.id;
+            const isSelected = selectedSeatId === seat.id || selectedSeatIds.includes(seat.id);
             const locked = isSeatLocked(seat);
             const noClick = clickBlocked(seat);
             return (

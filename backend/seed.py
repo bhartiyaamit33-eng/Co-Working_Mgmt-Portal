@@ -116,6 +116,7 @@ DEFAULT_CONFIG = {
     "working_hours_end": 18,     # 6 PM
     "daily_cap_hours": 4,
     "weekly_cap_hours": 20,
+    "monthly_cap_hours": 80,
     "lead_time_hours": 0,
     "booking_window_days": 7,
     "max_booking_hours": 4,
@@ -195,6 +196,11 @@ async def run_seed(db, hash_password_fn):
     # 4. Configuration
     if not await db.configuration.find_one({"id": "default"}):
         await db.configuration.insert_one(DEFAULT_CONFIG)
+    else:
+        await db.configuration.update_one(
+            {"id": "default", "monthly_cap_hours": {"$exists": False}},
+            {"$set": {"monthly_cap_hours": DEFAULT_CONFIG["monthly_cap_hours"]}},
+        )
 
     # 5. Demo teams (one per program)
     if await db.teams.count_documents({}) == 0:

@@ -10,7 +10,7 @@ export default function Dashboard() {
   const { user, team } = useAuth();
   const [bookings, setBookings] = useState([]);
   const [config, setConfig] = useState(null);
-  const [usage, setUsage] = useState({ daily: 0, weekly: 0 });
+  const [usage, setUsage] = useState({ daily: 0, weekly: 0, monthly: 0 });
 
   const loadBookings = useCallback(async () => {
     const { data } = await api.get("/bookings/mine");
@@ -22,7 +22,11 @@ export default function Dashboard() {
   }, []);
   const loadTeamUsage = useCallback(async (teamId) => {
     const { data } = await api.get(`/teams/${teamId}`);
-    setUsage({ daily: 0, weekly: data.weekly_hours || 0 });
+    setUsage({
+      daily: data.daily_hours || 0,
+      weekly: data.weekly_hours || 0,
+      monthly: data.monthly_hours || 0,
+    });
   }, []);
 
   useEffect(() => {
@@ -47,27 +51,15 @@ export default function Dashboard() {
       <GuidelinesAcceptModal />
 
       {/* Top KPI row */}
-      <div className="grid sm:grid-cols-3 gap-4 mb-8">
+      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <div className="dsse-card p-6">
           <span className="label-eyebrow">Team</span>
           <div className="font-serif text-2xl text-navy mt-2">{team?.name || "—"}</div>
           <div className="text-xs uppercase tracking-wider text-slate-500 mt-1">{team?.program?.replace("_", " ") || "Not assigned"}</div>
         </div>
-        <div className="dsse-card p-6">
-          <span className="label-eyebrow">Quota this week</span>
-          <div className="flex items-baseline gap-2 mt-2">
-            <span className="font-serif text-3xl text-navy">{usage.weekly}</span>
-            <span className="text-slate-400 text-sm">/ {weeklyCap}h</span>
-          </div>
-          <div className="mt-3 h-2 bg-navy/5 rounded-full overflow-hidden">
-            <div className="h-full bg-amber rounded-full transition-all" style={{ width: `${Math.min(100, (usage.weekly / weeklyCap) * 100)}%` }} />
-          </div>
-        </div>
-        <div className="dsse-card p-6">
-          <span className="label-eyebrow">Upcoming</span>
-          <div className="font-serif text-3xl text-navy mt-2">{upcoming.length}</div>
-          <div className="text-xs text-slate-500 mt-1">{upcoming.length === 0 ? "No reservations yet" : "Active reservations"}</div>
-        </div>
+        <QuotaCard label="Today" used={usage.daily} cap={config?.daily_cap_hours || 4} />
+        <QuotaCard label="This week" used={usage.weekly} cap={weeklyCap} />
+        <QuotaCard label="This month" used={usage.monthly} cap={config?.monthly_cap_hours || 80} />
       </div>
 
       {/* Upcoming bookings */}
@@ -104,6 +96,21 @@ export default function Dashboard() {
   );
 }
 
+function QuotaCard({ label, used, cap }) {
+  return (
+    <div className="dsse-card p-6">
+      <span className="label-eyebrow">{label}</span>
+      <div className="flex items-baseline gap-2 mt-2">
+        <span className="font-serif text-3xl text-navy">{used}</span>
+        <span className="text-slate-400 text-sm">/ {cap}h</span>
+      </div>
+      <div className="mt-3 h-2 bg-navy/5 rounded-full overflow-hidden">
+        <div className="h-full bg-amber rounded-full transition-all" style={{ width: `${Math.min(100, (used / Math.max(cap, 1)) * 100)}%` }} />
+      </div>
+    </div>
+  );
+}
+
 export function BookingRow({ b, onCancel }) {
   const start = new Date(b.start_time);
   const end = new Date(b.end_time);
@@ -121,7 +128,10 @@ export function BookingRow({ b, onCancel }) {
           <MapPin className="w-4 h-4 text-navy" />
         </div>
         <div className="min-w-0">
-          <div className="font-medium text-navy">Seat #{b.seat_id}</div>
+          <div className="font-medium text-navy">
+            Seat #{b.seat_id}
+            {b.user_name ? <span className="text-slate-500 font-normal"> · {b.user_name}</span> : null}
+          </div>
           <div className="text-xs text-slate-500 flex items-center gap-2 mt-0.5">
             <span>{date}</span>
             <span>·</span>
