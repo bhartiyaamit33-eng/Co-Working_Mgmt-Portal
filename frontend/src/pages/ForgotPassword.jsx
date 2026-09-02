@@ -23,9 +23,18 @@ export default function ForgotPassword() {
     setBusy(true); setErr("");
     try {
       const { data } = await api.post("/auth/request-otp", { email, purpose: "reset" });
-      if (data.otp) setDevOtp(data.otp);
+      if (data.otp) {
+        setDevOtp(data.otp);
+        setOtp(data.otp);
+      }
       setSent(true);
-      toast.success(data.delivered ? "A reset code was sent to your email." : "If this account exists, a reset code is ready.");
+      toast.success(
+        data.delivered
+          ? "A reset code was sent to your email."
+          : data.otp
+            ? "Email is not sending yet — use the code shown below."
+            : "If this account exists, a reset code is ready."
+      );
     } catch (e) {
       setErr(formatRequestError(e));
     } finally { setBusy(false); }
@@ -72,8 +81,8 @@ export default function ForgotPassword() {
           </>
         )}
         {devOtp && (
-          <div className="p-3 rounded-xl bg-amber/10 border border-amber/30 text-xs text-navy">
-            Email delivery is not configured locally. Your code is <span className="font-mono font-semibold">{devOtp}</span>
+          <div className="p-3 rounded-xl bg-amber/10 border border-amber/30 text-sm text-navy" data-testid="forgot-otp-fallback">
+            Email is not sending yet. Your code is <span className="font-mono font-semibold tracking-widest">{devOtp}</span>
           </div>
         )}
         {err && <div className="text-sm text-red-600">{err}</div>}
