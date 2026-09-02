@@ -10,8 +10,31 @@ from email.message import EmailMessage
 logger = logging.getLogger("dsse.mailer")
 
 
+def _send_ses(to: str, subject: str, text: str, from_addr: str) -> bool:
+    try:
+        import boto3
+        from botocore.exceptions import BotoCoreError, ClientError
+    except ImportError:
+        logger.warning("boto3 is not installed; cannot send via SES")
+        return False
+    region = os.environ.get("AWS_REGION") or os.environ.get("AWS_DEFAULT_REGION") or "ap-south-1"
+    try:
+        boto3.client("ses", region_name=region).send_email(
+            Source=from_addr,
+            Destination={"ToAddresses": [to]},
+            Message={
+                "Subject": {"Data": subject, "Charset": "UTF-8"},
+                "Body": {"Text": {"Data": text, "Charset": "UTF-8"}},
+            },
+        )
+        return True
+    except (BotoCoreError, ClientError):
+        logger.exception("SES send failed for %s", to)
+        return False
+
+
 def send_email(to: str, subject: str, text: str) -> bool:
-    """Send email via Resend or SMTP. Returns True only when a provider accepted it."""
+    """Send email via Resend, SMTP, or Amazon SES. Returns True only when a provider accepted it."""
     api_key = os.environ.get("RESEND_API_KEY", "").strip()
     if api_key:
         from_addr = os.environ.get("RESEND_FROM", "DSSE Booking <onboarding@resend.dev>")
@@ -56,5 +79,9 @@ def send_email(to: str, subject: str, text: str) -> bool:
             logger.exception("SMTP send failed for %s", to)
             return False
 
-    logger.info("[EMAIL undelivered — configure RESEND_API_KEY or SMTP_HOST]\nTo: %s\nSubject: %s\n%s", to, subject, text)
+    ses_from = os.environ.get("SES_FROM", "").strip()
+    if ses_from:
+        return _send_ses(to, subject, text, ses_from)
+
+    logger.info("[EMAIL undelivered — configure RESEND_API_KEY, SMTP_HOST, or SES_FROM]\nTo: %s\nSubject: %s\n%s", to, subject, text)
     return False

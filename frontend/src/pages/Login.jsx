@@ -47,8 +47,17 @@ export default function Login() {
     setBusy(true); setErr(""); setDevOtp("");
     try {
       const { data } = await api.post("/auth/request-otp", { email, purpose: "login" });
-      if (data.otp) setDevOtp(data.otp);
-      toast.success(data.delivered ? "A login code was sent to your email." : "If this account exists, a login code is ready.");
+      if (data.otp) {
+        setDevOtp(data.otp);
+        setOtp(data.otp);
+      }
+      toast.success(
+        data.delivered
+          ? "A login code was sent to your email."
+          : data.otp
+            ? "Email is not sending yet — use the code shown below."
+            : "If this account exists, a login code is ready."
+      );
     } catch (e) {
       setErr(formatRequestError(e));
     } finally { setBusy(false); }
@@ -117,8 +126,8 @@ export default function Login() {
             </div>
           </div>
           {devOtp && (
-            <div className="p-3 rounded-xl bg-amber/10 border border-amber/30 text-xs text-navy">
-              Email delivery is not configured locally. Your code is <span className="font-mono font-semibold">{devOtp}</span>
+            <div className="p-3 rounded-xl bg-amber/10 border border-amber/30 text-sm text-navy" data-testid="login-otp-fallback">
+              Email is not sending yet. Your code is <span className="font-mono font-semibold tracking-widest">{devOtp}</span>
             </div>
           )}
           {err && <div className="text-sm text-red-600 bg-red-50 p-3 rounded-xl border border-red-200" data-testid="login-error">{err}</div>}

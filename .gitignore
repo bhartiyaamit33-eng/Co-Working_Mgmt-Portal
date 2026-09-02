@@ -60,6 +60,10 @@ chainlit.md
 
 # Deployment
 .vercel
+deploy/.last-public-ip
+deploy/.last-instance-id
+deploy/.last-cloudfront-id
+deploy/.last-cloudfront-domain
 
 # Data and databases
 agenthub/agents/youtube/db
