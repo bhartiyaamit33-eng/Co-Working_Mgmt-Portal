@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>INVENT · DSSE Day · 31 Jan 2027 · IIT Bombay</title>
+  <meta name="description" content="INVENT is the Desai Sethi School of Entrepreneurship foundation-day gathering at IIT Bombay. 31 January 2027. Queries: support@iitbinvent.com" />
+  <meta property="og:title" content="INVENT — Make something India needs." />
+  <meta property="og:description" content="DSSE Day. Foundation day of the Desai Sethi School of Entrepreneurship, IIT Bombay. 31 January 2027." />
+  <meta property="og:type" content="website" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23020806'/%3E%3Ctext x='4' y='23' font-size='18' font-family='monospace' fill='%2339FFB0'%3EI%3C/text%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Instrument+Serif:ital@0;1&family=Syne:wght@700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #020806;
+      --ink: #e8fff4;
+      --mute: #7aa892;
+      --cyan: #3df0ff;
+      --green: #39ffb0;
+      --lime: #c8ff3d;
+      --line: rgba(61, 240, 255, 0.28);
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; background: var(--bg); color: var(--ink); }
+    body {
+      font-family: "IBM Plex Mono", ui-monospace, monospace;
+      overflow-x: hidden;
+    }
+    body::before {
+      content: "";
+      pointer-events: none;
+      position: fixed;
+      inset: 0;
+      z-index: 40;
+      background: repeating-linear-gradient(
+        to bottom,
+        transparent 0,
+        transparent 2px,
+        rgba(0, 0, 0, 0.18) 3px
+      );
+      mix-blend-mode: multiply;
+      opacity: 0.35;
+    }
+    a { color: var(--cyan); }
+    .noise {
+      pointer-events: none;
+      position: fixed;
+      inset: 0;
+      z-index: 30;
+      opacity: 0.07;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    }
+    .grid {
+      pointer-events: none;
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      background-image:
+        linear-gradient(var(--line) 1px, transparent 1px),
+        linear-gradient(90deg, var(--line) 1px, transparent 1px);
+      background-size: 72px 72px;
+      mask-image: radial-gradient(ellipse at 20% 10%, black 20%, transparent 70%);
+    }
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 14px 22px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(2, 8, 6, 0.86);
+      backdrop-filter: blur(10px);
+    }
+    .brand {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      text-decoration: none;
+      color: var(--ink);
+    }
+    .brand b {
+      font-family: Syne, sans-serif;
+      font-weight: 800;
+      letter-spacing: -0.04em;
+      font-size: 22px;
+    }
+    .brand span { color: var(--green); font-size: 11px; }
+    nav { display: flex; gap: 18px; font-size: 12px; text-transform: uppercase; }
+    nav a { color: var(--mute); text-decoration: none; }
+    nav a:hover { color: var(--cyan); }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--green);
+      background: var(--green);
+      color: #02140c;
+      text-decoration: none;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      padding: 10px 14px;
+      box-shadow: 0 0 24px rgba(57, 255, 176, 0.35);
+    }
+    .btn.ghost {
+      background: transparent;
+      color: var(--cyan);
+      border-color: var(--cyan);
+      box-shadow: 0 0 18px rgba(61, 240, 255, 0.2);
+    }
+    .hero {
+      position: relative;
+      z-index: 1;
+      padding: 28px 22px 8px;
+      max-width: 1280px;
+    }
+    .kicker {
+      color: var(--lime);
+      font-size: 12px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+    }
+    h1 {
+      font-family: Syne, sans-serif;
+      font-weight: 800;
+      letter-spacing: -0.07em;
+      line-height: 0.86;
+      font-size: clamp(72px, 18vw, 220px);
+      margin: 10px 0 0;
+      text-transform: uppercase;
+      background: linear-gradient(180deg, #f4fff9 10%, var(--cyan) 55%, var(--green) 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      filter: drop-shadow(0 0 28px rgba(61, 240, 255, 0.35));
+    }
+    .tag {
+      font-family: "Instrument Serif", serif;
+      font-size: clamp(28px, 4.6vw, 56px);
+      line-height: 1.05;
+      max-width: 16ch;
+      margin: 18px 0 28px;
+    }
+    .tag em { font-style: italic; color: var(--green); }
+    .row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+    .meta {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(140px, 1fr));
+      gap: 1px;
+      background: var(--line);
+      border: 1px solid var(--line);
+      margin: 36px 22px 0;
+      max-width: 1236px;
+    }
+    .meta div {
+      background: #04110c;
+      padding: 16px 18px;
+    }
+    .meta small { display: block; color: var(--mute); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 8px; }
+    .meta b { font-family: Syne, sans-serif; font-size: 22px; letter-spacing: -0.04em; color: var(--cyan); }
+    .ticker {
+      margin-top: 28px;
+      border-block: 1px solid var(--line);
+      overflow: hidden;
+      white-space: nowrap;
+      color: var(--green);
+      font-size: 13px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      padding: 10px 0;
+    }
+    .ticker span { display: inline-block; padding-left: 100%; animation: slide 28s linear infinite; }
+    @keyframes slide { to { transform: translateX(-100%); } }
+    section { position: relative; z-index: 1; padding: 64px 22px; max-width: 1280px; }
+    h2 {
+      font-family: Syne, sans-serif;
+      font-size: clamp(32px, 5vw, 64px);
+      letter-spacing: -0.05em;
+      line-height: 0.95;
+      margin: 0 0 18px;
+      text-transform: uppercase;
+    }
+    p.lead { max-width: 62ch; color: #c9ead8; line-height: 1.65; }
+    .split { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 28px; }
+    .card {
+      border: 1px solid var(--line);
+      padding: 22px;
+      background: linear-gradient(180deg, rgba(61,240,255,0.06), rgba(57,255,176,0.03));
+    }
+    .card h3 { margin: 0 0 8px; font-family: Syne, sans-serif; letter-spacing: -0.03em; text-transform: uppercase; }
+    .card p { margin: 0; color: #b7dcc8; font-size: 14px; line-height: 1.55; }
+    .agenda { display: grid; gap: 0; border: 1px solid var(--line); }
+    .agenda article {
+      display: grid;
+      grid-template-columns: 140px 1fr;
+      gap: 16px;
+      padding: 18px 20px;
+      border-bottom: 1px solid var(--line);
+    }
+    .agenda article:last-child { border-bottom: 0; }
+    .agenda time { color: var(--cyan); font-size: 12px; letter-spacing: 0.08em; }
+    .rfs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .rfs a {
+      display: block;
+      text-decoration: none;
+      color: inherit;
+      border: 1px dashed var(--line);
+      padding: 20px;
+      min-height: 180px;
+    }
+    .rfs a:hover { border-color: var(--green); box-shadow: inset 0 0 40px rgba(57,255,176,0.08); }
+    .rfs strong { display: block; font-family: Syne, sans-serif; font-size: 22px; letter-spacing: -0.04em; color: var(--lime); margin-bottom: 8px; }
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); }
+    .stats div { background: var(--bg); padding: 28px 18px; }
+    .stats b { display: block; font-family: Syne, sans-serif; font-size: 42px; letter-spacing: -0.06em; color: var(--green); }
+    .stats span { color: var(--mute); font-size: 12px; }
+    footer {
+      border-top: 1px solid var(--line);
+      padding: 28px 22px 80px;
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+      color: var(--mute);
+      font-size: 12px;
+      position: relative;
+      z-index: 1;
+    }
+    .mail {
+      font-size: 22px;
+      font-family: Syne, sans-serif;
+      color: var(--cyan);
+      text-decoration: none;
+    }
+    @media (max-width: 900px) {
+      nav { display: none; }
+      .meta, .split, .rfs, .stats, .agenda article { grid-template-columns: 1fr; }
+      h1 { font-size: 22vw; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .ticker span { animation: none; padding-left: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="noise" aria-hidden="true"></div>
+  <div class="grid" aria-hidden="true"></div>
+  <header>
+    <a class="brand" href="/">
+      <b>INVENT</b>
+      <span>DSSE · IITB</span>
+    </a>
+    <nav>
+      <a href="#about">About</a>
+      <a href="#day">The day</a>
+      <a href="#rfs">Request for startups</a>
+      <a href="#query">Queries</a>
+    </nav>
+    <a class="btn" href="mailto:support@iitbinvent.com?subject=INVENT%20DSSE%20Day%20query">Email support</a>
+  </header>
+
+  <div class="hero">
+    <div class="kicker">IIT Bombay · Desai Sethi School of Entrepreneurship</div>
+    <h1>Invent</h1>
+    <p class="tag">Make something <em>India needs.</em> Foundation day. One room. Founders, faculty, and people who ship.</p>
+    <div class="row">
+      <a class="btn" href="mailto:support@iitbinvent.com?subject=INVENT%20RSVP%20%2F%20pitch">Request a seat</a>
+      <a class="btn ghost" href="mailto:support@iitbinvent.com?subject=INVENT%20query">Ask anything</a>
+    </div>
+  </div>
+
+  <div class="meta">
+    <div><small>When</small><b>31 Jan 2027</b></div>
+    <div><small>What</small><b>DSSE Day</b></div>
+    <div><small>Where</small><b>IIT Bombay, Powai</b></div>
+    <div><small>Countdown</small><b id="cd">—</b></div>
+  </div>
+
+  <div class="ticker" aria-hidden="true">
+    <span>INVENT 2027 · DSSE FOUNDATION DAY · 31 JANUARY · BATCH ENERGY · NEON CAMPUS · MAKE SOMETHING PEOPLE WANT · LAB TO MARKET · IIT BOMBAY · SUPPORT@IITBINVENT.COM · </span>
+  </div>
+
+  <section id="about">
+    <div class="split">
+      <div>
+        <h2>Not a fest.<br>A founding day.</h2>
+        <p class="lead">On 31 January 2014 the Board of Governors of IIT Bombay approved the Desai Sethi Centre for Entrepreneurship. That date is DSSE Day: the school’s foundation day. INVENT is the public face of that anniversary in 2027 — a YC-shaped gathering for people who build companies out of IITB labs, hostels, and stubborn ideas.</p>
+        <p class="lead">DSSE trains founders in public. Since 2014: 4,300+ students through courses, ~950 mentored, ~340 venture teams, 100+ startups registered. The school sits between E-Cell, SINE, and the rest of the IIT Bombay startup stack.</p>
+      </div>
+      <div class="card">
+        <h3>Who should show up</h3>
+        <p>Student founders with a prototype. Researchers stuck at lab-to-market. Alumni who want to mentor for a day. Operators who can write a cheque or open a door. If you only want a selfie with a stage, skip it.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="day">
+    <h2>The day</h2>
+    <p class="lead">Exact rooms drop closer to January. The shape of the day does not.</p>
+    <div class="agenda">
+      <article>
+        <time>0930</time>
+        <div>
+          <strong>Open</strong>
+          <p>Doors, badges, coffee that is actually coffee. Sit with a stranger who is shipping.</p>
+        </div>
+      </article>
+      <article>
+        <time>1100</time>
+        <div>
+          <strong>Foundation hour</strong>
+          <p>Why 31 January matters. DSSE’s next decade. What the school will fund, teach, and refuse.</p>
+        </div>
+      </article>
+      <article>
+        <time>1400</time>
+        <div>
+          <strong>Invent pitches</strong>
+          <p>Short, brutal, useful. No 40-slide decks. Problem, wedge, proof, ask.</p>
+        </div>
+      </article>
+      <article>
+        <time>1700</time>
+        <div>
+          <strong>Office hours</strong>
+          <p>Faculty, alumni, operators. Bring a one-pager or a working demo. Leave with a next step.</p>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <section id="rfs">
+    <h2>Request for startups</h2>
+    <p class="lead">We are biased toward hard problems. Email a 8-line note to support if you are building in one of these.</p>
+    <div class="rfs">
+      <a href="mailto:support@iitbinvent.com?subject=RFS%20Climate%20%2F%20energy">
+        <strong>Climate & energy</strong>
+        Hardware, software, or ugly industrial process. India cannot wait for imported climate tech.
+      </a>
+      <a href="mailto:support@iitbinvent.com?subject=RFS%20Health">
+        <strong>Health that ships</strong>
+        Diagnostics, devices, care ops. BETIC-adjacent or not. Must leave the lab.
+      </a>
+      <a href="mailto:support@iitbinvent.com?subject=RFS%20Deep%20tech">
+        <strong>Deep tech</strong>
+        Space, robotics, materials, AI that is not a wrapper. Prefer teams that can fabricate.
+      </a>
+    </div>
+  </section>
+
+  <section>
+    <h2>Scoreboard</h2>
+    <div class="stats">
+      <div><b>2014</b><span>Board approved the centre. Foundation day locked.</span></div>
+      <div><b>4300+</b><span>Students through entrepreneurship courses.</span></div>
+      <div><b>340</b><span>Venture teams formed inside the school.</span></div>
+      <div><b>100+</b><span>Startups registered by DSSE students.</span></div>
+    </div>
+  </section>
+
+  <section id="query">
+    <h2>Queries</h2>
+    <p class="lead">Press, partners, speakers, volunteers, campus access, or “I have a company and a problem.” One inbox. Humans read it.</p>
+    <p><a class="mail" href="mailto:support@iitbinvent.com">support@iitbinvent.com</a></p>
+    <p class="lead">Desai Sethi School of Entrepreneurship · Monash Building · IIT Bombay · Powai, Mumbai 400076</p>
+  </section>
+
+  <footer>
+    <div>INVENT · DSSE Day · 31 January 2027 · IIT Bombay</div>
+    <div>Not affiliated with Y Combinator. Just the same allergy to slides.</div>
+  </footer>
+
+  <script>
+    (function () {
+      var target = new Date("2027-01-31T09:30:00+05:30").getTime();
+      var el = document.getElementById("cd");
+      function tick() {
+        var d = target - Date.now();
+        if (d <= 0) { el.textContent = "LIVE"; return; }
+        var days = Math.floor(d / 86400000);
+        el.textContent = days + "d";
+      }
+      tick();
+      setInterval(tick, 60000);
+    })();
+  </script>
+</body>
+</html>
