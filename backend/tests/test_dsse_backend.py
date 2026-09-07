@@ -49,9 +49,18 @@ class TestAuth:
         })
         assert r.status_code == 400
 
-    def test_login_rejects_non_iitb(self):
+    def test_login_unknown_gmail_is_invalid_credentials(self):
         r = requests.post(f"{API}/auth/login", json={"email": "random.person@gmail.com", "password": "whatever"})
-        assert r.status_code == 400
+        assert r.status_code == 401
+
+    def test_register_accepts_iitbombay_org(self):
+        email = f"test_org_{datetime.utcnow().timestamp()}@iitbombay.org"
+        r = requests.post(f"{API}/auth/register", json={
+            "email": email, "password": "Test@123",
+            "first_name": "Org", "last_name": "Staff",
+        })
+        assert r.status_code == 200, r.text
+        assert r.json()["user"]["email"] == email
 
     def test_register_applicant(self):
         email = f"test_applicant_{datetime.utcnow().timestamp()}@iitb.ac.in"
@@ -462,9 +471,10 @@ class TestOtp:
         assert r2.json()["user"]["email"] == STATE["member_email"]
         assert r2.json()["token"]
 
-    def test_otp_rejects_gmail(self):
+    def test_otp_unknown_gmail_does_not_leak(self):
         r = requests.post(f"{API}/auth/request-otp", json={"email": "someone@gmail.com", "purpose": "login"})
-        assert r.status_code == 400
+        assert r.status_code == 200
+        assert r.json().get("otp") in (None, "")
 
     def test_admin_otp_allowed(self):
         r = requests.post(f"{API}/auth/request-otp", json={"email": SUPER_ADMIN_EMAIL, "purpose": "login"})
@@ -504,12 +514,17 @@ class TestTeamBooking:
         assert login.status_code == 200
         STATE["together_lead_token"] = login.json()["token"]
 
-    def test_admin_cannot_create_gmail_member(self, admin_session):
+    def test_admin_can_create_gmail_member(self, admin_session):
+        stamp = int(datetime.utcnow().timestamp())
+        email = f"external_{stamp}@gmail.com"
         r = admin_session.post(f"{API}/admin/users", json={
-            "email": "someone.else@gmail.com", "first_name": "No", "last_name": "Gmail",
+            "email": email, "first_name": "Ext", "last_name": "User",
             "role": "member", "initial_password": "Member@123",
         })
-        assert r.status_code == 400
+        assert r.status_code == 200, r.text
+        login = requests.post(f"{API}/auth/login", json={"email": email, "password": "Member@123"})
+        assert login.status_code == 200
+        assert login.json()["user"]["email"] == email
 
     def test_member_cannot_team_book(self):
         member_email = STATE["together_lead_email"].replace("_0@", "_1@")

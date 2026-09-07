@@ -1,16 +1,20 @@
-export const MEMBER_EMAIL_DOMAIN = "iitb.ac.in";
-export const ADMIN_EMAIL = "ideas.iitb@gmail.com";
+export const MEMBER_EMAIL_DOMAINS = ["iitb.ac.in", "iitbombay.org"];
 
 export function normalizeEmail(email) {
   return String(email || "").trim().toLowerCase();
 }
 
-export function isAllowedLoginEmail(email) {
-  const e = normalizeEmail(email);
-  return e === ADMIN_EMAIL || e.endsWith(`@${MEMBER_EMAIL_DOMAIN}`);
+export function memberDomainsLabel() {
+  return MEMBER_EMAIL_DOMAINS.map((d) => `@${d}`).join(" or ");
 }
 
+export function isMemberEmail(email) {
+  const e = normalizeEmail(email);
+  return MEMBER_EMAIL_DOMAINS.some((d) => e.endsWith(`@${d}`));
+}
+
+/** Self-serve signup: IITB addresses only. Login lets the API decide. */
 export function loginEmailError(email) {
-  if (isAllowedLoginEmail(email)) return null;
-  return `Only @${MEMBER_EMAIL_DOMAIN} emails can register or log in. Admin access is limited to ${ADMIN_EMAIL}.`;
+  if (isMemberEmail(email)) return null;
+  return `Only ${memberDomainsLabel()} emails can register.`;
 }

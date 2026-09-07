@@ -10,22 +10,39 @@ from policy import (
     find_consecutive_block,
     login_email_error,
     account_email_error,
+    signup_email_error,
 )
 
 
-def test_iitb_email_allowed():
-    assert login_email_error("student@iitb.ac.in") is None
-    assert login_email_error("student@gmail.com") is not None
+def test_iitb_and_iitbombay_signup_allowed():
+    assert signup_email_error("student@iitb.ac.in") is None
+    assert signup_email_error("staff@iitbombay.org") is None
+    err = signup_email_error("student@gmail.com")
+    assert err is not None
+    assert ADMIN_EMAIL not in err
+    assert "iitb.ac.in" in err
+    assert "iitbombay.org" in err
+
+
+def test_login_allows_any_domain():
+    assert login_email_error("student@gmail.com") is None
+    assert login_email_error(ADMIN_EMAIL) is None
 
 
 def test_admin_gmail_allowed():
-    assert login_email_error(ADMIN_EMAIL) is None
+    assert signup_email_error(ADMIN_EMAIL) is None
     assert account_email_error(ADMIN_EMAIL, "super_admin") is None
 
 
 def test_cannot_make_iitb_user_admin():
     assert account_email_error("lead@iitb.ac.in", "admin") is not None
     assert account_email_error("lead@iitb.ac.in", "team_lead") is None
+
+
+def test_admin_create_any_domain():
+    assert account_email_error("guest@gmail.com", "member", enforce_member_domain=False) is None
+    assert account_email_error("visitor@company.org", "team_lead", enforce_member_domain=False) is None
+    assert account_email_error("guest@gmail.com", "member", enforce_member_domain=True) is not None
 
 
 def test_consecutive_same_cluster():
