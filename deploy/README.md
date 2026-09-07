@@ -16,7 +16,7 @@ Default region is `ap-south-1` (Mumbai). Override with `AWS_REGION=us-east-1`.
 
 The script prints a public `http://<ip>/` link. **From the IIT Bombay campus network, share the CloudFront HTTPS URL instead** (`https://<id>.cloudfront.net/`) — campus proxy blocks direct SSH/HTTP to EC2 public IPs.
 
-Admin account is `ideas.iitb@gmail.com` (password from `ADMIN_PASSWORD`, default `Admin@123`). Team testers must use `@iitb.ac.in` emails.
+Testers must use an `@iitb.ac.in` or `@iitbombay.org` email.
 
 Tear down when you are done (avoids ongoing EC2 charges):
 

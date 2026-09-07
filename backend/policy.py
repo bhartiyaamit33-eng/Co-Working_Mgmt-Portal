@@ -2,8 +2,19 @@
 import os
 from typing import Iterable, List, Optional, Sequence, Tuple
 
-MEMBER_EMAIL_DOMAIN = os.environ.get("MEMBER_EMAIL_DOMAIN", "iitb.ac.in").lower()
 ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "ideas.iitb@gmail.com").lower()
+
+
+def _parse_member_email_domains() -> frozenset:
+    raw = os.environ.get("MEMBER_EMAIL_DOMAINS", "").strip()
+    if raw:
+        return frozenset(d.strip().lower().lstrip("@") for d in raw.split(",") if d.strip())
+    primary = os.environ.get("MEMBER_EMAIL_DOMAIN", "iitb.ac.in").strip().lower().lstrip("@") or "iitb.ac.in"
+    return frozenset({primary, "iitbombay.org"})
+
+
+MEMBER_EMAIL_DOMAINS = _parse_member_email_domains()
+MEMBER_EMAIL_DOMAIN = os.environ.get("MEMBER_EMAIL_DOMAIN", "iitb.ac.in").strip().lower().lstrip("@") or "iitb.ac.in"
 
 # Fishbone clusters on the 4th floor (same grouping as the floor map).
 SEAT_CLUSTERS: Tuple[Tuple[int, ...], ...] = (
@@ -28,41 +39,74 @@ def normalize_email(email: str) -> str:
     return (email or "").strip().lower()
 
 
+def member_domains_phrase() -> str:
+    preferred = ("iitb.ac.in", "iitbombay.org")
+    ordered = [d for d in preferred if d in MEMBER_EMAIL_DOMAINS]
+    ordered.extend(sorted(MEMBER_EMAIL_DOMAINS.difference(preferred)))
+    labels = [f"@{d}" for d in ordered]
+    if not labels:
+        return "@iitb.ac.in"
+    if len(labels) == 1:
+        return labels[0]
+    if len(labels) == 2:
+        return f"{labels[0]} or {labels[1]}"
+    return ", ".join(labels[:-1]) + f", or {labels[-1]}"
+
+
 def is_admin_email(email: str) -> bool:
     return normalize_email(email) == ADMIN_EMAIL
 
 
 def is_member_email(email: str) -> bool:
-    return normalize_email(email).endswith(f"@{MEMBER_EMAIL_DOMAIN}")
+    e = normalize_email(email)
+    if "@" not in e:
+        return False
+    return e.rsplit("@", 1)[-1] in MEMBER_EMAIL_DOMAINS
 
 
 def is_allowed_login_email(email: str) -> bool:
+    """Public self-serve: member domains, plus the configured admin mailbox."""
     return is_admin_email(email) or is_member_email(email)
 
 
 def login_email_error(email: str) -> Optional[str]:
-    """Return a rejection message, or None if the email may sign in / sign up."""
+    """Sign-in / OTP / reset: any mailbox may try; unknown accounts still fail later."""
+    if not normalize_email(email):
+        return "Email is required."
+    return None
+
+
+def signup_email_error(email: str) -> Optional[str]:
+    """Self-serve register: IITB member domains only."""
     e = normalize_email(email)
     if not e:
         return "Email is required."
-    if is_admin_email(e) or is_member_email(e):
+    if is_allowed_login_email(e):
         return None
-    return (
-        f"Only @{MEMBER_EMAIL_DOMAIN} emails can register or log in. "
-        f"Admin access is limited to {ADMIN_EMAIL}."
-    )
+    return f"Only {member_domains_phrase()} emails can register."
 
 
-def account_email_error(email: str, role: Optional[str] = None) -> Optional[str]:
-    """Reject disallowed emails, and any admin role that is not the sole admin account."""
+def account_email_error(
+    email: str,
+    role: Optional[str] = None,
+    *,
+    enforce_member_domain: bool = True,
+) -> Optional[str]:
+    """Reject disallowed emails, and any admin role that is not the sole admin account.
+
+    When enforce_member_domain is False (admin create / CSV), any domain is allowed.
+    """
     e = normalize_email(email)
-    domain_err = login_email_error(e)
-    if domain_err:
-        return domain_err
+    if not e:
+        return "Email is required."
+    if enforce_member_domain:
+        domain_err = signup_email_error(e)
+        if domain_err:
+            return domain_err
     if role in ADMIN_ROLES and not is_admin_email(e):
-        return f"Admin access is limited to {ADMIN_EMAIL}."
+        return "This account cannot be given an admin role."
     if is_admin_email(e) and role not in (None, *ADMIN_ROLES):
-        return f"{ADMIN_EMAIL} is reserved for admin access."
+        return "This email cannot be used for a member account."
     return None
 
 

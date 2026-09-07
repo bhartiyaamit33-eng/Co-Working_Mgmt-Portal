@@ -61,7 +61,7 @@ export default function Signup() {
         <div>
           <label className="label-eyebrow">IIT Bombay email</label>
           <input type="email" required value={form.email} onChange={update("email")} className="input-field mt-1" placeholder="you@iitb.ac.in" data-testid="signup-email-input" />
-          <p className="text-[11px] text-slate-500 mt-1">Must be an @iitb.ac.in address. Gmail is not accepted for team accounts.</p>
+          <p className="text-[11px] text-slate-500 mt-1">Must be an @iitb.ac.in or @iitbombay.org address.</p>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>

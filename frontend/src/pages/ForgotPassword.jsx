@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { AuthShell } from "./Login";
 import api, { formatRequestError } from "@/lib/api";
-import { loginEmailError } from "@/lib/email";
 import { toast } from "sonner";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 
@@ -18,8 +17,6 @@ export default function ForgotPassword() {
 
   const sendCode = async (e) => {
     e.preventDefault();
-    const domainErr = loginEmailError(email);
-    if (domainErr) { setErr(domainErr); return; }
     setBusy(true); setErr("");
     try {
       const { data } = await api.post("/auth/request-otp", { email, purpose: "reset" });

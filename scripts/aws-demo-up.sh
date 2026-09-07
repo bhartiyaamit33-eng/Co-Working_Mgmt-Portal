@@ -148,6 +148,7 @@ ADMIN_EMAIL=ideas.iitb@gmail.com
 ADMIN_PASSWORD=${ADMIN_PASSWORD}
 ADMIN_SYNC_ON_START=true
 MEMBER_EMAIL_DOMAIN=iitb.ac.in
+MEMBER_EMAIL_DOMAINS=iitb.ac.in,iitbombay.org
 CORS_ORIGINS=http://${PUBLIC_IP},http://localhost
 EOF"
 
@@ -166,9 +167,7 @@ echo
 echo "Share this link with testers:"
 echo "  http://${PUBLIC_IP}/"
 echo
-echo "Admin login: ideas.iitb@gmail.com"
-echo "Admin password: ${ADMIN_PASSWORD}"
-echo "Team testers must use an @iitb.ac.in email."
+echo "Testers must use an @iitb.ac.in or @iitbombay.org email."
 echo
 echo "Stop/delete later: AWS_REGION=$REGION $ROOT/scripts/aws-demo-down.sh"
 echo "$PUBLIC_IP" > "$ROOT/deploy/.last-public-ip"

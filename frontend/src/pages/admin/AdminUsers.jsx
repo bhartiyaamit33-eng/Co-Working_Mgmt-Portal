@@ -157,7 +157,8 @@ export default function AdminUsers() {
 
 const CSV_USER_TEMPLATE = `email,first_name,last_name,initial_password,role,team_id,roll_number,phone
 student1@iitb.ac.in,Asha,Kumar,TempPass123,member,,
-student2@iitb.ac.in,Rohan,Singh,TempPass456,team_lead,,
+staff1@iitbombay.org,Rohan,Singh,TempPass456,team_lead,,
+guest1@gmail.com,Priya,Nair,TempPass789,member,,
 `;
 
 function ImportUsersCsvModal({ onClose, onDone }) {
@@ -202,7 +203,7 @@ function ImportUsersCsvModal({ onClose, onDone }) {
         <h3 className="font-serif text-xl text-navy mt-2">Import users from CSV</h3>
         <p className="text-sm text-slate-600 mt-2 leading-relaxed">
           Required columns: <strong>email</strong>, <strong>first_name</strong>, <strong>last_name</strong>, and <strong>initial_password</strong> (or <strong>password</strong>).
-          Emails must be <strong>@iitb.ac.in</strong>. Optional: <strong>role</strong> (member, team_lead), <strong>team_id</strong>, roll_number, phone.
+          Emails can use any domain. Optional: <strong>role</strong> (member, team_lead), <strong>team_id</strong>, roll_number, phone.
         </p>
         <div className="flex flex-wrap gap-2 mt-4">
           <button type="button" className="btn-outline text-sm" onClick={downloadTemplate} data-testid="csv-download-template">Download template</button>
@@ -241,7 +242,7 @@ function CreateUserModal({ teams, onClose, onCreated }) {
         <span className="label-eyebrow">Create new user</span>
         <h3 className="font-serif text-xl text-navy mt-2">Pre-issued credentials</h3>
         <div className="space-y-3 mt-4">
-          <input className="input-field" placeholder="you@iitb.ac.in" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} data-testid="cu-email" />
+          <input className="input-field" placeholder="user@example.com" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} data-testid="cu-email" />
           <div className="grid grid-cols-2 gap-2">
             <input className="input-field" placeholder="First name" value={form.first_name} onChange={(e) => setForm({ ...form, first_name: e.target.value })} data-testid="cu-firstname" />
             <input className="input-field" placeholder="Last name" value={form.last_name} onChange={(e) => setForm({ ...form, last_name: e.target.value })} data-testid="cu-lastname" />
@@ -249,7 +250,7 @@ function CreateUserModal({ teams, onClose, onCreated }) {
           <select className="input-field" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} data-testid="cu-role">
             {["member", "team_lead"].map((r) => <option key={r} value={r}>{r}</option>)}
           </select>
-          <p className="text-[11px] text-slate-500">Only @iitb.ac.in emails. Admin login stays ideas.iitb@gmail.com.</p>
+          <p className="text-[11px] text-slate-500">Any email domain is allowed.</p>
           <select className="input-field" value={form.team_id} onChange={(e) => setForm({ ...form, team_id: e.target.value })} data-testid="cu-team">
             <option value="">— No team —</option>
             {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}

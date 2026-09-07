@@ -24,7 +24,7 @@ from auth import (
 )
 from mailer import send_email
 from policy import (
-    ADMIN_EMAIL, account_email_error, are_consecutive_in_cluster,
+    account_email_error, are_consecutive_in_cluster,
     is_admin_email, login_email_error, normalize_email,
 )
 from seed import run_seed
@@ -232,9 +232,14 @@ async def get_config() -> dict:
     return cfg
 
 
-def require_allowed_email(email: str, role: Optional[str] = None) -> str:
+def require_allowed_email(
+    email: str,
+    role: Optional[str] = None,
+    *,
+    enforce_member_domain: bool = True,
+) -> str:
     email = normalize_email(email)
-    err = account_email_error(email, role)
+    err = account_email_error(email, role, enforce_member_domain=enforce_member_domain)
     if err:
         raise HTTPException(400, err)
     return email
@@ -468,7 +473,7 @@ async def _consume_otp(email: str, otp: str, purpose: str) -> None:
 async def register(payload: RegisterIn, response: Response):
     email = require_allowed_email(payload.email)
     if is_admin_email(email):
-        raise HTTPException(400, f"{ADMIN_EMAIL} is reserved for admin access.")
+        raise HTTPException(400, "This email cannot be used to apply for access.")
     if await db.users.find_one({"email": email}):
         raise HTTPException(400, "Email is already registered.")
     user_id = str(uuid.uuid4())
@@ -503,7 +508,7 @@ async def login(payload: LoginIn, response: Response):
     if user.get("status") == "suspended":
         raise HTTPException(403, "Your account has been suspended.")
     if user.get("role") in ALL_ADMIN_ROLES and not is_admin_email(email):
-        raise HTTPException(403, f"Admin access is limited to {ADMIN_EMAIL}.")
+        raise HTTPException(403, "This account cannot sign in with an admin role.")
     return _issue_session(response, user)
 
 
@@ -574,7 +579,7 @@ async def verify_otp_login(payload: VerifyOtpIn, response: Response):
     if user.get("status") == "suspended":
         raise HTTPException(403, "Your account has been suspended.")
     if user.get("role") in ALL_ADMIN_ROLES and not is_admin_email(email):
-        raise HTTPException(403, f"Admin access is limited to {ADMIN_EMAIL}.")
+        raise HTTPException(403, "This account cannot sign in with an admin role.")
     return _issue_session(response, user)
 
 
@@ -679,9 +684,9 @@ async def list_users(role: Optional[str] = None, status: Optional[str] = None, _
 
 @api.post("/admin/users")
 async def admin_create_user(payload: UserCreateAdmin, _: dict = Depends(require_admin)):
-    email = require_allowed_email(payload.email, payload.role)
+    email = require_allowed_email(payload.email, payload.role, enforce_member_domain=False)
     if payload.role in ALL_ADMIN_ROLES and not is_admin_email(email):
-        raise HTTPException(400, f"Admin access is limited to {ADMIN_EMAIL}.")
+        raise HTTPException(400, "This account cannot be given an admin role.")
     if await db.users.find_one({"email": email}):
         raise HTTPException(400, "Email already registered")
     uid = str(uuid.uuid4())
@@ -771,7 +776,7 @@ async def admin_import_users_csv(file: UploadFile = File(...), _: dict = Depends
         except ValidationError:
             errors.append(f"Row {line_no}: invalid email {email!r}")
             continue
-        policy_err = account_email_error(email, role)
+        policy_err = account_email_error(email, role, enforce_member_domain=False)
         if policy_err:
             errors.append(f"Row {line_no}: {policy_err}")
             continue

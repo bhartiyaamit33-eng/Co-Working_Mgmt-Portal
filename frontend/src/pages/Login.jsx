@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth, formatRequestError } from "@/lib/auth";
 import api from "@/lib/api";
-import { loginEmailError } from "@/lib/email";
 import Logo from "@/components/Logo";
 import { toast } from "sonner";
 import { ArrowRight } from "lucide-react";
@@ -30,8 +29,6 @@ export default function Login() {
 
   const onPasswordSubmit = async (e) => {
     e.preventDefault();
-    const domainErr = loginEmailError(email);
-    if (domainErr) { setErr(domainErr); return; }
     setBusy(true); setErr("");
     try {
       finishLogin(await login(email, password));
@@ -42,8 +39,6 @@ export default function Login() {
 
   const sendOtp = async (e) => {
     e.preventDefault();
-    const domainErr = loginEmailError(email);
-    if (domainErr) { setErr(domainErr); return; }
     setBusy(true); setErr(""); setDevOtp("");
     try {
       const { data } = await api.post("/auth/request-otp", { email, purpose: "login" });
@@ -65,8 +60,6 @@ export default function Login() {
 
   const onOtpSubmit = async (e) => {
     e.preventDefault();
-    const domainErr = loginEmailError(email);
-    if (domainErr) { setErr(domainErr); return; }
     if (otp.length !== 6) { setErr("Enter the 6-digit code from your email."); return; }
     setBusy(true); setErr("");
     try {
@@ -79,8 +72,7 @@ export default function Login() {
   return (
     <AuthShell title="Welcome back" subtitle="Log in to your account">
       <div className="mb-5 p-3 rounded-xl bg-navy/5 text-xs text-navy/80 leading-relaxed">
-        Team leads and members sign in with an <span className="font-medium">@iitb.ac.in</span> email.
-        Admin access is limited to <span className="font-medium">ideas.iitb@gmail.com</span>.
+        Sign in with your <span className="font-medium">@iitb.ac.in</span> or <span className="font-medium">@iitbombay.org</span> email.
       </div>
       <div className="inline-flex bg-navy/5 rounded-xl p-1 mb-5" role="tablist">
         <button type="button" onClick={() => { setMode("password"); setErr(""); }}

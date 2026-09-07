@@ -62,7 +62,7 @@ export default function Landing() {
           <h2 className="font-serif text-3xl sm:text-4xl text-navy mt-2 mb-12">Three steps to your seat.</h2>
           <div className="grid md:grid-cols-3 gap-6">
             {[
-              { n: "01", t: "Apply or Log In", d: "Sign in with your @iitb.ac.in email (password or a one-time code). Only ideas.iitb@gmail.com has admin access.", icon: ShieldCheck },
+              { n: "01", t: "Apply or Log In", d: "Sign in with your @iitb.ac.in or @iitbombay.org email (password or a one-time code).", icon: ShieldCheck },
               { n: "02", t: "Pick a seat & time", d: "Use the interactive floor map to choose a workstation and your hours within the working window.", icon: MapPin },
               { n: "03", t: "Get approved", d: "Your team's faculty admin reviews and confirms. You'll be notified the moment it's approved.", icon: Calendar },
             ].map((s) => {
